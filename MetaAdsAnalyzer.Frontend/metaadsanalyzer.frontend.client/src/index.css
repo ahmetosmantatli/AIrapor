@@ -1,0 +1,67 @@
+:root {
+  --text: #4b5563;
+  --text-muted: #6b7280;
+  --text-h: #111827;
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --border: #e5e7eb;
+  --code-bg: #f3f4f6;
+  /* Kapak + portal ortak marka (Reklam Rapor tarzı güven / büyüme yeşili) */
+  --brand-500: #10b981;
+  --brand-600: #059669;
+  --brand-700: #047857;
+  --accent: #059669;
+  --accent-bg: rgba(5, 150, 105, 0.12);
+  --accent-border: rgba(5, 150, 105, 0.45);
+
+  --sans: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 16px/1.5 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-muted: #6b7280;
+    --text-h: #f9fafb;
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-2: #22262f;
+    --border: #2d3340;
+    --code-bg: #22262f;
+    --brand-500: #34d399;
+    --brand-600: #10b981;
+    --brand-700: #6ee7b7;
+    --accent: #34d399;
+    --accent-bg: rgba(52, 211, 153, 0.15);
+    --accent-border: rgba(52, 211, 153, 0.4);
+  }
+}
+
+#root {
+  min-height: 100svh;
+  margin: 0;
+  width: 100%;
+  text-align: initial;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2 {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+p {
+  margin: 0;
+}

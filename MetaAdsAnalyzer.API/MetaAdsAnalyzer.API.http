@@ -1,0 +1,6 @@
+@MetaAdsAnalyzer.API_HostAddress = http://localhost:5195
+
+GET {{MetaAdsAnalyzer.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

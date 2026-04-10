@@ -1,0 +1,24 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+
+# Node / frontend build
+**/node_modules/
+**/dist/
+
+# Published SPA (yeniden üretilir: npm run publish:api)
+MetaAdsAnalyzer.API/wwwroot/**
+!MetaAdsAnalyzer.API/wwwroot/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

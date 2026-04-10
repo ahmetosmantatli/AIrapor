@@ -1,0 +1,125 @@
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-header--portal {
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface) 100%);
+  box-shadow: 0 1px 0 rgba(5, 150, 105, 0.08);
+}
+
+.app-shell--portal {
+  background: var(--bg);
+}
+
+.app-nav--portal {
+  background: var(--surface);
+  border-bottom-color: rgba(5, 150, 105, 0.12);
+}
+
+.brand--portal {
+  text-decoration: none;
+  color: inherit;
+}
+
+.portal-home-link {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.portal-home-link:hover {
+  color: var(--brand-600);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.brand-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-email {
+  font-size: 0.85rem;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn.ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn.ghost.small {
+  padding: 0.35rem 0.65rem;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.nav-link {
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.nav-link.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.app-main {
+  flex: 1;
+  padding: 1.25rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}

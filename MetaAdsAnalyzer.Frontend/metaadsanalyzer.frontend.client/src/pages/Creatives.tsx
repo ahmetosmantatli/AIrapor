@@ -1,0 +1,114 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  getActiveDirectives,
+  getWatchlist,
+  toggleWatchlist,
+} from '../api/client'
+import type { DirectiveItem } from '../api/types'
+import { useUser } from '../context/UserContext'
+import './Pages.css'
+
+export function Creatives() {
+  const { userId } = useUser()
+  const [items, setItems] = useState<DirectiveItem[]>([])
+  const [watchIds, setWatchIds] = useState<Set<string>>(() => new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [d, w] = await Promise.all([getActiveDirectives(userId), getWatchlist()])
+      setItems(d)
+      const adSet = new Set(
+        w.filter((x) => x.level === 'ad').map((x) => x.entityId),
+      )
+      setWatchIds(adSet)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Hata')
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    let c = false
+    reload().then(() => {
+      if (c) return
+    })
+    return () => {
+      c = true
+    }
+  }, [reload])
+
+  const ads = useMemo(() => {
+    const adRows = items.filter((x) => x.entityType === 'ad')
+    const byEntity = new Map<string, DirectiveItem>()
+    for (const row of adRows.sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt))) {
+      if (!byEntity.has(row.entityId)) byEntity.set(row.entityId, row)
+    }
+    return [...byEntity.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+  }, [items])
+
+  async function onToggleWatch(entityId: string) {
+    setBusyId(entityId)
+    setError(null)
+    try {
+      const r = await toggleWatchlist('ad', entityId)
+      setWatchIds((prev) => {
+        const next = new Set(prev)
+        if (r.isWatching) next.add(entityId)
+        else next.delete(entityId)
+        return next
+      })
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Takip güncellenemedi')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="page">
+      <h1 className="page-title">Kreatif skorlar</h1>
+      <p className="page-lead">
+        Reklam düzeyinde özet skor ve sağlık etiketi (son değerlendirme). Yıldız ile takip listesine
+        ekleyin.
+      </p>
+
+      {loading && <p className="muted">Yükleniyor…</p>}
+      {error && <p className="error-banner">{error}</p>}
+
+      {!loading && !error && ads.length === 0 && (
+        <p className="muted">Reklam direktifi yok. Insights (ad seviyesi) ve direktif üretimini çalıştırın.</p>
+      )}
+
+      <ul className="creative-grid">
+        {ads.map((d) => (
+          <li key={d.entityId} className="creative-card">
+            <div className="creative-top">
+              {d.score != null && <span className="score-badge">{d.score}</span>}
+              {d.healthStatus && <span className="health-pill">{d.healthStatus}</span>}
+              <button
+                type="button"
+                className="watch-toggle"
+                title={watchIds.has(d.entityId) ? 'Takipten çık' : 'Takip et'}
+                disabled={busyId === d.entityId}
+                onClick={() => onToggleWatch(d.entityId)}
+                aria-pressed={watchIds.has(d.entityId)}
+              >
+                {watchIds.has(d.entityId) ? '★' : '☆'}
+              </button>
+            </div>
+            <p className="creative-id" title={d.entityId}>
+              Reklam ID: {d.entityId}
+            </p>
+            <p className="creative-msg">{d.message}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
