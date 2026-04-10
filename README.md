@@ -10,7 +10,8 @@ ASP.NET Core 8 Web API + React (Vite) + SQL Server — Meta reklam insights anal
 
 ## Hızlı başlangıç (Windows / Mac)
 
-1. `ConnectionStrings:DefaultConnection` değerini kendi SQL örneğinize göre `MetaAdsAnalyzer.API/appsettings.json` veya User Secrets ile ayarlayın.
+1. `ConnectionStrings:DefaultConnection` değerini kendi SQL örneğinize göre ayarlayın (örnek: `appsettings.Development.EXAMPLE.json`). Windows’ta User Secrets önerilir:  
+   `cd MetaAdsAnalyzer.API` → `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=...;Database=MetaAdsAnalyzer;..."`
 2. API: `cd MetaAdsAnalyzer.API` → `dotnet ef database update --project ../MetaAdsAnalyzer.Infrastructure/MetaAdsAnalyzer.Infrastructure.csproj`
 3. API çalıştır: `dotnet run --launch-profile http` (varsayılan http://localhost:5195)
 4. Frontend: `cd MetaAdsAnalyzer.Frontend/metaadsanalyzer.frontend.client` → `npm ci` → `npm run dev` → http://localhost:5173
