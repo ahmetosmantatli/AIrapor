@@ -32,6 +32,15 @@ public class SubscriptionPlan
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Pro: analiz PDF indirme.</summary>
+    public bool AllowsPdfExport { get; set; }
+
+    /// <summary>Pro: kreatif takip listesi.</summary>
+    public bool AllowsWatchlist { get; set; }
+
+    /// <summary>Bu planda kullanıcının bağlayabileceği en fazla Meta reklam hesabı sayısı.</summary>
+    public int MaxLinkedMetaAdAccounts { get; set; } = 2;
+
     public DateTimeOffset UpdatedAt { get; set; }
 
     public ICollection<User> Users { get; set; } = new List<User>();

@@ -11,11 +11,17 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.CreatedAt).HasPrecision(3);
         builder.Property(e => e.MetaTokenExpiresAt).HasPrecision(3);
-        builder.Property(e => e.MetaAccessToken).HasColumnType("nvarchar(max)");
+        builder.Property(e => e.PlanExpiresAt).HasPrecision(3);
+        builder.Property(e => e.SubscriptionStatus).HasMaxLength(32);
+        builder.Property(e => e.StripeCustomerId).HasMaxLength(128);
+        builder.Property(e => e.StripeSubscriptionId).HasMaxLength(128);
+        builder.Property(e => e.MetaAccessToken).HasColumnType("text");
         builder.Property(e => e.PasswordHash).HasMaxLength(512);
 
         builder.HasIndex(e => e.Email).IsUnique();
-        builder.HasIndex(e => e.MetaUserId).IsUnique();
+        builder.HasIndex(e => e.MetaUserId)
+            .IsUnique()
+            .HasFilter("\"MetaUserId\" IS NOT NULL");
 
         builder.HasMany(e => e.Products)
             .WithOne(e => e.User)

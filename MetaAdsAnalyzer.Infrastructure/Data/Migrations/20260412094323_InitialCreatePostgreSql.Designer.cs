@@ -3,17 +3,17 @@ using System;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
 namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260403213906_AddMetaOAuthToUsers")]
-    partial class AddMetaOAuthToUsers
+    [Migration("20260412094323_InitialCreatePostgreSql")]
+    partial class InitialCreatePostgreSql
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -21,28 +21,28 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.11")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.CampaignProductMap", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CampaignId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("character varying(128)");
 
                     b.Property<int>("ProductId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -58,16 +58,16 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal?>("BreakEvenRoas")
                         .HasColumnType("decimal(18,6)");
 
                     b.Property<DateTimeOffset>("ComputedAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<decimal?>("Cpa")
                         .HasColumnType("decimal(18,4)");
@@ -91,7 +91,7 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("RawInsightId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal?>("Roas")
                         .HasColumnType("decimal(18,6)");
@@ -113,44 +113,51 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("DirectiveType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("EntityType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("HealthStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("Score")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Severity")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTimeOffset>("TriggeredAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<int>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -163,16 +170,16 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Cogs")
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<decimal>("LtvMultiplier")
                         .HasColumnType("decimal(18,4)");
@@ -180,7 +187,7 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
+                        .HasColumnType("character varying(512)");
 
                     b.Property<decimal>("PaymentFeePct")
                         .HasColumnType("decimal(9,4)");
@@ -198,7 +205,7 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .HasColumnType("decimal(9,4)");
 
                     b.Property<int>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -211,9 +218,9 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<long>("AddToCart")
                         .HasColumnType("bigint");
@@ -239,15 +246,15 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Property<string>("EntityId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("EntityName")
                         .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<DateTimeOffset>("FetchedAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<decimal>("Frequency")
                         .HasColumnType("decimal(18,6)");
@@ -261,10 +268,18 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("character varying(32)");
 
                     b.Property<long>("LinkClicks")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("MetaAdAccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MetaCampaignId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<decimal>("PurchaseValue")
                         .HasColumnType("decimal(18,4)");
@@ -279,7 +294,7 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("UserId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("VideoAvgWatchTime")
                         .HasColumnType("decimal(18,4)");
@@ -307,57 +322,170 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Level", "EntityId", "DateStart", "DateStop");
+                    b.HasIndex("UserId", "MetaAdAccountId", "Level", "EntityId", "DateStart", "DateStop");
 
                     b.ToTable("raw_insights");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AllowsPdfExport")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AllowsWatchlist")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaxLinkedMetaAdAccounts")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasPrecision(3)
+                        .HasColumnType("timestamp(3) with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("subscription_plans");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AllowsPdfExport = false,
+                            AllowsWatchlist = false,
+                            Code = "standard",
+                            Currency = "TRY",
+                            Description = "Özet metrikler, kampanya eşlemesi, temel raporlar.",
+                            DisplayName = "Standart",
+                            IsActive = true,
+                            MaxLinkedMetaAdAccounts = 2,
+                            MonthlyPrice = 299m,
+                            SortOrder = 1,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 4, 4, 12, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AllowsPdfExport = true,
+                            AllowsWatchlist = true,
+                            Code = "pro",
+                            Currency = "TRY",
+                            Description = "PDF dışa aktarma, takip listesi ve genişletilmiş kullanım.",
+                            DisplayName = "Pro",
+                            IsActive = true,
+                            MaxLinkedMetaAdAccounts = 4,
+                            MonthlyPrice = 599m,
+                            SortOrder = 2,
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 4, 4, 12, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AttributionWindow")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
-                        .HasColumnType("nvarchar(320)");
+                        .HasColumnType("character varying(320)");
 
                     b.Property<string>("MetaAccessToken")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("MetaAdAccountId")
                         .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset?>("MetaTokenExpiresAt")
                         .HasPrecision(3)
-                        .HasColumnType("datetimeoffset(3)");
+                        .HasColumnType("timestamp(3) with time zone");
 
                     b.Property<string>("MetaUserId")
                         .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset?>("PlanExpiresAt")
+                        .HasPrecision(3)
+                        .HasColumnType("timestamp(3) with time zone");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("SubscriptionPlanId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SubscriptionStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("Timezone")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("character varying(128)");
 
                     b.HasKey("Id");
 
@@ -366,9 +494,76 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 
                     b.HasIndex("MetaUserId")
                         .IsUnique()
-                        .HasFilter("[MetaUserId] IS NOT NULL");
+                        .HasFilter("\"MetaUserId\" IS NOT NULL");
+
+                    b.HasIndex("SubscriptionPlanId");
 
                     b.ToTable("users");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.UserMetaAdAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasPrecision(3)
+                        .HasColumnType("timestamp(3) with time zone");
+
+                    b.Property<string>("MetaAdAccountId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "MetaAdAccountId")
+                        .IsUnique();
+
+                    b.ToTable("user_meta_ad_accounts");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.WatchlistItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasPrecision(3)
+                        .HasColumnType("timestamp(3) with time zone");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Level", "EntityId")
+                        .IsUnique();
+
+                    b.ToTable("watchlist_items");
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.CampaignProductMap", b =>
@@ -434,6 +629,39 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.User", b =>
+                {
+                    b.HasOne("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", "SubscriptionPlan")
+                        .WithMany("Users")
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SubscriptionPlan");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.UserMetaAdAccount", b =>
+                {
+                    b.HasOne("MetaAdsAnalyzer.Core.Entities.User", "User")
+                        .WithMany("UserMetaAdAccounts")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.WatchlistItem", b =>
+                {
+                    b.HasOne("MetaAdsAnalyzer.Core.Entities.User", "User")
+                        .WithMany("WatchlistItems")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.Product", b =>
                 {
                     b.Navigation("CampaignProductMaps");
@@ -442,6 +670,11 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.RawInsight", b =>
                 {
                     b.Navigation("ComputedMetrics");
+                });
+
+            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", b =>
+                {
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.User", b =>
@@ -453,6 +686,10 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("RawInsights");
+
+                    b.Navigation("UserMetaAdAccounts");
+
+                    b.Navigation("WatchlistItems");
                 });
 #pragma warning restore 612, 618
         }

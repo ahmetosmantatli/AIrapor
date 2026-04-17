@@ -1,5 +1,6 @@
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
+using MetaAdsAnalyzer.Core.Subscription;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,7 @@ public class UsersController : ControllerBase
                     Id = u.Id,
                     Email = u.Email,
                     MetaAdAccountId = u.MetaAdAccountId,
+                    MaxLinkedMetaAdAccounts = u.SubscriptionPlan.MaxLinkedMetaAdAccounts,
                     Currency = u.Currency,
                     Timezone = u.Timezone,
                     AttributionWindow = u.AttributionWindow,
@@ -53,10 +55,39 @@ public class UsersController : ControllerBase
                     PlanDisplayName = u.SubscriptionPlan.DisplayName,
                     PlanMonthlyPrice = u.SubscriptionPlan.MonthlyPrice,
                     PlanCurrency = u.SubscriptionPlan.Currency,
+                    PlanAllowsPdfExport = u.SubscriptionPlan.AllowsPdfExport,
+                    PlanAllowsWatchlist = u.SubscriptionPlan.AllowsWatchlist,
+                    SubscriptionStatus = u.SubscriptionStatus,
+                    PlanExpiresAt = u.PlanExpiresAt,
                 })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return dto is null ? NotFound() : Ok(dto);
+        if (dto is null)
+        {
+            return NotFound();
+        }
+
+        dto.LinkedMetaAdAccounts = await _db.UserMetaAdAccounts.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderBy(x => x.LinkedAt)
+            .Select(
+                x => new UserMetaAdAccountItemDto
+                {
+                    Id = x.Id,
+                    MetaAdAccountId = x.MetaAdAccountId,
+                    DisplayName = x.DisplayName,
+                    LinkedAt = x.LinkedAt,
+                })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var grants = SubscriptionAccess.GrantsPlanFeatures(
+            dto.SubscriptionStatus,
+            dto.PlanExpiresAt,
+            DateTimeOffset.UtcNow);
+        dto.PlanAllowsPdfExport = grants && dto.PlanAllowsPdfExport;
+        dto.PlanAllowsWatchlist = grants && dto.PlanAllowsWatchlist;
+        return Ok(dto);
     }
 }

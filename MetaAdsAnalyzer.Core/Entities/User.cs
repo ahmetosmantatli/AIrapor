@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using MetaAdsAnalyzer.Core.Subscription;
 
 namespace MetaAdsAnalyzer.Core.Entities;
 
@@ -42,6 +43,20 @@ public class User
 
     public SubscriptionPlan SubscriptionPlan { get; set; } = null!;
 
+    /// <summary>Ödeme sağlayıcısı / manuel yönetim: active, canceled, past_due, expired, none.</summary>
+    [Required]
+    [MaxLength(32)]
+    public string SubscriptionStatus { get; set; } = SubscriptionStatuses.Active;
+
+    /// <summary>Faturalı dönem bitişi (UTC). Null = süre sınırı yok (geliştirme veya manuel Pro).</summary>
+    public DateTimeOffset? PlanExpiresAt { get; set; }
+
+    [MaxLength(128)]
+    public string? StripeCustomerId { get; set; }
+
+    [MaxLength(128)]
+    public string? StripeSubscriptionId { get; set; }
+
     /// <summary>E-posta + şifre ile giriş (Meta OAuth kullanıcılarında genelde boş).</summary>
     [MaxLength(512)]
     public string? PasswordHash { get; set; }
@@ -55,4 +70,6 @@ public class User
     public ICollection<Directive> Directives { get; set; } = new List<Directive>();
 
     public ICollection<WatchlistItem> WatchlistItems { get; set; } = new List<WatchlistItem>();
+
+    public ICollection<UserMetaAdAccount> UserMetaAdAccounts { get; set; } = new List<UserMetaAdAccount>();
 }

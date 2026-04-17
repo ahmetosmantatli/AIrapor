@@ -6,7 +6,12 @@ public sealed class UserProfileResponseDto
 
     public string Email { get; set; } = null!;
 
+    /// <summary>Sync ve raporlar için seçili aktif hesap (Graph act_…).</summary>
     public string? MetaAdAccountId { get; set; }
+
+    public int MaxLinkedMetaAdAccounts { get; set; }
+
+    public List<UserMetaAdAccountItemDto> LinkedMetaAdAccounts { get; set; } = new();
 
     public string Currency { get; set; } = null!;
 
@@ -25,4 +30,12 @@ public sealed class UserProfileResponseDto
     public decimal PlanMonthlyPrice { get; set; }
 
     public string PlanCurrency { get; set; } = null!;
+
+    public bool PlanAllowsPdfExport { get; set; }
+
+    public bool PlanAllowsWatchlist { get; set; }
+
+    public string SubscriptionStatus { get; set; } = null!;
+
+    public DateTimeOffset? PlanExpiresAt { get; set; }
 }

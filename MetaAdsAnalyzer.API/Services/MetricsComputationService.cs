@@ -1,3 +1,4 @@
+using MetaAdsAnalyzer.API.Extensions;
 using MetaAdsAnalyzer.Core.Entities;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -27,8 +28,14 @@ public sealed class MetricsComputationService : IMetricsComputationService
             throw new InvalidOperationException($"Kullanıcı bulunamadı: {userId}");
         }
 
+        var activeMeta = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.MetaAdAccountId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         var rawIds = await _db.RawInsights.AsNoTracking()
-            .Where(r => r.UserId == userId)
+            .ForUserActiveAdAccount(userId, activeMeta)
             .Select(r => r.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);

@@ -51,10 +51,20 @@ export type InsightsSyncResult = {
   pageCount: number
 }
 
+export type LinkedMetaAdAccountItem = {
+  id: number
+  metaAdAccountId: string
+  displayName: string | null
+  linkedAt: string
+}
+
 export type UserProfile = {
   id: number
   email: string
   metaAdAccountId: string | null
+  /** Plan limiti; eski API yanıtlarında olmayabilir. */
+  maxLinkedMetaAdAccounts?: number
+  linkedMetaAdAccounts?: LinkedMetaAdAccountItem[]
   currency: string
   timezone: string
   attributionWindow: string
@@ -64,6 +74,10 @@ export type UserProfile = {
   planDisplayName: string
   planMonthlyPrice: number
   planCurrency: string
+  planAllowsPdfExport: boolean
+  planAllowsWatchlist: boolean
+  subscriptionStatus: string
+  planExpiresAt: string | null
 }
 
 export type SubscriptionPlan = {
@@ -74,6 +88,9 @@ export type SubscriptionPlan = {
   currency: string
   sortOrder: number
   updatedAt: string
+  allowsPdfExport: boolean
+  allowsWatchlist: boolean
+  maxLinkedMetaAdAccounts?: number
 }
 
 export type AdAccountItem = {

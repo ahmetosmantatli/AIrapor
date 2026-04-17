@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   downloadAnalysisPdf,
+  getUserProfile,
   postDirectivesEvaluate,
   postInsightsSync,
   postMetricsRecompute,
@@ -14,6 +15,21 @@ export function Tools() {
   const [preset, setPreset] = useState('last_7d')
   const [log, setLog] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pdfAllowed, setPdfAllowed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let c = false
+    getUserProfile(userId)
+      .then((p) => {
+        if (!c) setPdfAllowed(p.planAllowsPdfExport === true)
+      })
+      .catch(() => {
+        if (!c) setPdfAllowed(false)
+      })
+    return () => {
+      c = true
+    }
+  }, [userId])
 
   async function run(label: string, fn: () => Promise<unknown>) {
     setBusy(true)
@@ -91,10 +107,15 @@ export function Tools() {
       <section className="panel">
         <h2 className="panel-title">PDF rapor (Faza 6)</h2>
         <p className="muted small">Aktif direktifler ve özet sayılar.</p>
+        {pdfAllowed === false && (
+          <p className="muted small">
+            PDF dışa aktarma Pro planda. Ayarlar → Abonelik planı üzerinden Pro’ya geçebilirsiniz.
+          </p>
+        )}
         <button
           type="button"
           className="btn"
-          disabled={busy}
+          disabled={busy || pdfAllowed !== true}
           onClick={() => run('PDF indir', () => downloadAnalysisPdf().then(() => ({ ok: true })))}
         >
           Analiz PDF indir

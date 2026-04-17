@@ -1,5 +1,6 @@
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
+using MetaAdsAnalyzer.Core;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -45,9 +46,25 @@ public class UserSettingsController : ControllerBase
 
         if (body.MetaAdAccountId is not null)
         {
-            user.MetaAdAccountId = string.IsNullOrWhiteSpace(body.MetaAdAccountId)
-                ? null
-                : body.MetaAdAccountId.Trim();
+            if (string.IsNullOrWhiteSpace(body.MetaAdAccountId))
+            {
+                user.MetaAdAccountId = null;
+            }
+            else
+            {
+                var act = MetaAdAccountIdNormalizer.Normalize(body.MetaAdAccountId);
+                var linked = await _db.UserMetaAdAccounts.AnyAsync(
+                        x => x.UserId == userId && x.MetaAdAccountId == act,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (!linked)
+                {
+                    return BadRequest(
+                        new { message = "Bu reklam hesabı bağlı değil. Önce hesabı bağlayın veya listeden seçin." });
+                }
+
+                user.MetaAdAccountId = act;
+            }
         }
 
         if (body.Currency is not null)

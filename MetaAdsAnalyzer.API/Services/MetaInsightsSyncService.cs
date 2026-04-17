@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using MetaAdsAnalyzer.API.Options;
+using MetaAdsAnalyzer.Core;
 using MetaAdsAnalyzer.Core.Entities;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -104,7 +105,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
 
         datePreset = string.IsNullOrWhiteSpace(datePreset) ? "last_7d" : datePreset.Trim();
 
-        var actId = NormalizeAdAccountId(user.MetaAdAccountId);
+        var actId = MetaAdAccountIdNormalizer.Normalize(user.MetaAdAccountId);
         var version = string.IsNullOrWhiteSpace(_options.ApiVersion) ? "v19.0" : _options.ApiVersion.Trim().TrimStart('/');
         var fields = string.Join(",", InsightsFieldList);
 
@@ -146,7 +147,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             foreach (var row in data.EnumerateArray())
             {
                 fetched++;
-                var mapped = MapRow(userId, level, row);
+                var mapped = MapRow(userId, level, row, actId);
                 if (mapped is null)
                 {
                     continue;
@@ -154,6 +155,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
 
                 var existing = await _db.RawInsights.FirstOrDefaultAsync(
                         r => r.UserId == userId
+                             && r.MetaAdAccountId == actId
                              && r.Level == level
                              && r.EntityId == mapped.EntityId
                              && r.DateStart == mapped.DateStart
@@ -266,7 +268,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         return plain;
     }
 
-    private static RawInsight? MapRow(int userId, string level, JsonElement row)
+    private static RawInsight? MapRow(int userId, string level, JsonElement row, string actId)
     {
         var (entityId, entityName) = GetEntityInfo(level, row);
         if (string.IsNullOrWhiteSpace(entityId))
@@ -300,6 +302,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         return new RawInsight
         {
             UserId = userId,
+            MetaAdAccountId = actId,
             FetchedAt = DateTimeOffset.UtcNow,
             Level = level,
             EntityId = entityId,
@@ -336,6 +339,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         target.FetchedAt = source.FetchedAt;
         target.EntityName = source.EntityName;
         target.MetaCampaignId = source.MetaCampaignId;
+        target.MetaAdAccountId = source.MetaAdAccountId;
         target.Spend = source.Spend;
         target.Impressions = source.Impressions;
         target.Reach = source.Reach;
@@ -368,17 +372,6 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             "ad" => (GetString(row, "ad_id"), GetString(row, "ad_name")),
             _ => (string.Empty, null),
         };
-    }
-
-    private static string NormalizeAdAccountId(string raw)
-    {
-        var t = raw.Trim();
-        if (t.StartsWith("act_", StringComparison.OrdinalIgnoreCase))
-        {
-            return t;
-        }
-
-        return "act_" + t;
     }
 
     private static string GetString(JsonElement obj, string name)

@@ -142,7 +142,7 @@ export function LandingPage() {
           <div className="landing-cta-band">
             <p>Hazır mısınız? Kayıt olduktan sonra uygulama portalına yönlendirilirsiniz.</p>
             <Link to="/register" className="marketing-btn marketing-btn--primary marketing-btn--lg">
-              Abone ol
+              Kayıt ol
             </Link>
           </div>
         </div>
@@ -172,6 +172,10 @@ export function LandingPage() {
                   <span>/ ay</span>
                 </p>
                 {p.description && <p className="landing-price-card__desc">{p.description}</p>}
+                <ul className="landing-price-card__features muted small">
+                  <li>PDF rapor: {p.allowsPdfExport ? 'Dahil' : '—'}</li>
+                  <li>Takip listesi: {p.allowsWatchlist ? 'Dahil' : '—'}</li>
+                </ul>
                 <Link to="/register" className="marketing-btn marketing-btn--primary marketing-btn--sm">
                   Bu planla başla
                 </Link>

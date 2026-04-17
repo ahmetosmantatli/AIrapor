@@ -29,6 +29,10 @@ public class RawInsight
     [MaxLength(128)]
     public string? MetaCampaignId { get; set; }
 
+    /// <summary>Insights kaynağı reklam hesabı (Graph act_…).</summary>
+    [MaxLength(64)]
+    public string? MetaAdAccountId { get; set; }
+
     public DateOnly DateStart { get; set; }
 
     public DateOnly DateStop { get; set; }

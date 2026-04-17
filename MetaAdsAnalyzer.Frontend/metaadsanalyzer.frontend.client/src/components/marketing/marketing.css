@@ -8,14 +8,15 @@
 }
 
 .marketing-nav--hero {
-  background: rgba(255, 255, 255, 0.72);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(10, 10, 15, 0.82);
+  border-bottom: 1px solid hsl(var(--border));
+  backdrop-filter: blur(12px);
 }
 
 .marketing-nav--bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  background: rgba(18, 18, 24, 0.92);
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 .marketing-nav__inner {
@@ -97,18 +98,18 @@ button.marketing-btn {
 .marketing-btn--primary {
   background: linear-gradient(135deg, var(--brand-600), var(--brand-500));
   color: #fff !important;
-  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.35);
 }
 
 .marketing-btn--primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  box-shadow: 0 6px 22px rgba(99, 102, 241, 0.45);
 }
 
 .marketing-btn--outline {
   background: transparent;
   color: var(--text-h) !important;
-  border: 2px solid var(--border);
+  border: 2px solid hsl(var(--border));
   box-shadow: none;
 }
 
@@ -125,7 +126,7 @@ button.marketing-btn {
 .marketing-footer {
   margin-top: auto;
   background: var(--surface-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid hsl(var(--border));
 }
 
 .marketing-footer__inner {
@@ -191,7 +192,7 @@ button.marketing-btn {
   padding: 1rem 1.25rem 1.5rem;
   font-size: 0.8rem;
   color: var(--text-muted);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid hsl(var(--border));
 }
 
 .public-auth-shell {

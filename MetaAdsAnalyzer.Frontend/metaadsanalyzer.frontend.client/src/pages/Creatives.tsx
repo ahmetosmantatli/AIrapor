@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getActiveDirectives,
+  getUserProfile,
   getWatchlist,
   toggleWatchlist,
 } from '../api/client'
@@ -15,17 +16,26 @@ export function Creatives() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [watchAllowed, setWatchAllowed] = useState(false)
 
   const reload = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [d, w] = await Promise.all([getActiveDirectives(userId), getWatchlist()])
+      const profile = await getUserProfile(userId)
+      const allow = profile.planAllowsWatchlist === true
+      setWatchAllowed(allow)
+      const d = await getActiveDirectives(userId)
       setItems(d)
-      const adSet = new Set(
-        w.filter((x) => x.level === 'ad').map((x) => x.entityId),
-      )
-      setWatchIds(adSet)
+      if (allow) {
+        const w = await getWatchlist()
+        const adSet = new Set(
+          w.filter((x) => x.level === 'ad').map((x) => x.entityId),
+        )
+        setWatchIds(adSet)
+      } else {
+        setWatchIds(new Set())
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Hata')
     } finally {
@@ -53,6 +63,7 @@ export function Creatives() {
   }, [items])
 
   async function onToggleWatch(entityId: string) {
+    if (!watchAllowed) return
     setBusyId(entityId)
     setError(null)
     try {
@@ -78,6 +89,14 @@ export function Creatives() {
         ekleyin.
       </p>
 
+      {!loading && !watchAllowed && (
+        <section className="panel">
+          <p className="muted small">
+            Takip listesi Pro planda. Ayarlar → Abonelik planı bölümünden Pro’ya geçerek kullanabilirsiniz.
+          </p>
+        </section>
+      )}
+
       {loading && <p className="muted">Yükleniyor…</p>}
       {error && <p className="error-banner">{error}</p>}
 
@@ -94,8 +113,14 @@ export function Creatives() {
               <button
                 type="button"
                 className="watch-toggle"
-                title={watchIds.has(d.entityId) ? 'Takipten çık' : 'Takip et'}
-                disabled={busyId === d.entityId}
+                title={
+                  !watchAllowed
+                    ? 'Pro plan gerekli'
+                    : watchIds.has(d.entityId)
+                      ? 'Takipten çık'
+                      : 'Takip et'
+                }
+                disabled={!watchAllowed || busyId === d.entityId}
                 onClick={() => onToggleWatch(d.entityId)}
                 aria-pressed={watchIds.has(d.entityId)}
               >

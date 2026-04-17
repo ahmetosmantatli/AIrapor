@@ -11,7 +11,7 @@ public class RawInsightConfiguration : IEntityTypeConfiguration<RawInsight>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.FetchedAt).HasPrecision(3);
 
-        builder.HasIndex(e => new { e.UserId, e.Level, e.EntityId, e.DateStart, e.DateStop });
+        builder.HasIndex(e => new { e.UserId, e.MetaAdAccountId, e.Level, e.EntityId, e.DateStart, e.DateStop });
 
         builder.HasMany(e => e.ComputedMetrics)
             .WithOne(e => e.RawInsight)

@@ -53,7 +53,9 @@ public class AdminSubscriptionPlansController : ControllerBase
         }
 
         if (body.MonthlyPrice is null && body.DisplayName is null && body.Description is null
-            && body.Currency is null && body.IsActive is null && body.SortOrder is null)
+            && body.Currency is null && body.IsActive is null && body.SortOrder is null
+            && body.AllowsPdfExport is null && body.AllowsWatchlist is null
+            && body.MaxLinkedMetaAdAccounts is null)
         {
             return BadRequest(new { message = "En az bir alan gönderilmelidir." });
         }
@@ -88,6 +90,21 @@ public class AdminSubscriptionPlansController : ControllerBase
             plan.SortOrder = body.SortOrder.Value;
         }
 
+        if (body.AllowsPdfExport is not null)
+        {
+            plan.AllowsPdfExport = body.AllowsPdfExport.Value;
+        }
+
+        if (body.AllowsWatchlist is not null)
+        {
+            plan.AllowsWatchlist = body.AllowsWatchlist.Value;
+        }
+
+        if (body.MaxLinkedMetaAdAccounts is not null)
+        {
+            plan.MaxLinkedMetaAdAccounts = body.MaxLinkedMetaAdAccounts.Value;
+        }
+
         plan.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -101,6 +118,9 @@ public class AdminSubscriptionPlansController : ControllerBase
                 Currency = plan.Currency,
                 SortOrder = plan.SortOrder,
                 UpdatedAt = plan.UpdatedAt,
+                AllowsPdfExport = plan.AllowsPdfExport,
+                AllowsWatchlist = plan.AllowsWatchlist,
+                MaxLinkedMetaAdAccounts = plan.MaxLinkedMetaAdAccounts,
             });
     }
 }

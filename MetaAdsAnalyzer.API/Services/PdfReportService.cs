@@ -1,3 +1,5 @@
+using MetaAdsAnalyzer.API.Extensions;
+using MetaAdsAnalyzer.Core;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
@@ -21,7 +23,7 @@ public sealed class PdfReportService : IPdfReportService
     {
         var user = await _db.Users.AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => new { u.Email, u.Currency })
+            .Select(u => new { u.Email, u.Currency, u.MetaAdAccountId })
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         if (user is null)
@@ -30,13 +32,18 @@ public sealed class PdfReportService : IPdfReportService
         }
 
         var directives = await _directives.GetActiveDirectivesAsync(userId, cancellationToken).ConfigureAwait(false);
-        var rawCount = await _db.RawInsights.CountAsync(r => r.UserId == userId, cancellationToken)
+        var rawCount = await _db.RawInsights.AsNoTracking()
+            .ForUserActiveAdAccount(userId, user.MetaAdAccountId)
+            .CountAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var act = MetaAdAccountIdNormalizer.Normalize(user.MetaAdAccountId);
         var computedCount = await (
                 from c in _db.ComputedMetrics
                 join r in _db.RawInsights on c.RawInsightId equals r.Id
                 where r.UserId == userId
-                select c)
+                      && (string.IsNullOrEmpty(act) ? r.MetaAdAccountId == null : r.MetaAdAccountId == act)
+                select c.Id)
             .CountAsync(cancellationToken)
             .ConfigureAwait(false);
 

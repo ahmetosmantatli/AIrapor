@@ -30,6 +30,7 @@ builder.Services.Configure<MetaInsightsSchedulingOptions>(
     builder.Configuration.GetSection(MetaInsightsSchedulingOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var jwtSecret = jwtSection.SecretKey ?? string.Empty;
@@ -64,6 +65,7 @@ builder.Services.AddHttpClient<IMetaInsightsSyncService, MetaInsightsSyncService
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IPdfReportService, PdfReportService>();
+builder.Services.AddScoped<IStripeBillingService, StripeBillingService>();
 
 builder.Services.AddScoped<IMetricsComputationService, MetricsComputationService>();
 builder.Services.AddScoped<IDirectiveEngineService, DirectiveEngineService>();

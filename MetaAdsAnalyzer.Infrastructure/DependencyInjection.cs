@@ -20,7 +20,7 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseNpgsql(connectionString));
 
         return services;
     }

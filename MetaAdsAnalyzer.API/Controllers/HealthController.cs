@@ -18,7 +18,7 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// API ve SQL Server bağlantı durumu.
+    /// API ve PostgreSQL bağlantı durumu.
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<HealthResponse>> Get(CancellationToken cancellationToken)

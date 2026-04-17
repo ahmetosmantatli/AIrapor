@@ -1,3 +1,4 @@
+using MetaAdsAnalyzer.API.Extensions;
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
 using MetaAdsAnalyzer.Infrastructure.Data;
@@ -44,7 +45,13 @@ public class RawInsightsController : ControllerBase
             return BadRequest(new { message = "level: campaign, adset veya ad olmalıdır." });
         }
 
-        var q = _db.RawInsights.AsNoTracking().Where(r => r.UserId == userId);
+        var activeMeta = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.MetaAdAccountId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var q = _db.RawInsights.AsNoTracking().ForUserActiveAdAccount(userId, activeMeta);
         if (levelNorm is not null)
         {
             q = q.Where(r => r.Level == levelNorm);

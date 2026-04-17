@@ -17,6 +17,12 @@ public sealed class SubscriptionPlanResponseDto
     public int SortOrder { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    public bool AllowsPdfExport { get; set; }
+
+    public bool AllowsWatchlist { get; set; }
+
+    public int MaxLinkedMetaAdAccounts { get; set; }
 }
 
 public sealed class SelectMyPlanRequestDto
@@ -43,4 +49,11 @@ public sealed class AdminUpdateSubscriptionPlanDto
     public bool? IsActive { get; set; }
 
     public int? SortOrder { get; set; }
+
+    public bool? AllowsPdfExport { get; set; }
+
+    public bool? AllowsWatchlist { get; set; }
+
+    [Range(1, 99)]
+    public int? MaxLinkedMetaAdAccounts { get; set; }
 }

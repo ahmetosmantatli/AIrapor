@@ -60,7 +60,7 @@
 .form-stack select {
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--bg);
   color: var(--text-h);
   font-size: 0.95rem;
@@ -96,7 +96,7 @@
 
 .data-table th,
 .data-table td {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid hsl(var(--border));
   padding: 0.55rem 0.4rem;
   text-align: left;
   vertical-align: top;
@@ -150,7 +150,7 @@
 .filter-bar select {
   padding: 0.45rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--bg);
   color: var(--text-h);
   min-width: 10rem;
@@ -166,7 +166,7 @@
 .stat-card {
   padding: 1rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--surface);
 }
 
@@ -209,7 +209,7 @@
 .panel {
   padding: 1.1rem 1.25rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--surface);
   margin-bottom: 1rem;
 }
@@ -227,7 +227,7 @@
 
 .directive-row {
   padding: 0.65rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid hsl(var(--border));
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.5rem;
@@ -292,7 +292,7 @@
 .form-row input {
   padding: 0.4rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--bg);
   color: var(--text-h);
   min-width: 10rem;
@@ -302,7 +302,7 @@
   display: inline-block;
   padding: 0.55rem 1rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--surface-2);
   color: var(--text-h);
   font-weight: 600;
@@ -335,7 +335,7 @@
   background: var(--code-bg);
   font-size: 0.8rem;
   overflow: auto;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
 }
 
 .creative-grid {
@@ -350,7 +350,7 @@
 .creative-card {
   padding: 1rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--surface);
 }
 
@@ -428,7 +428,7 @@ code {
   padding: 1.5rem 1.35rem 2rem;
   border-radius: 16px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08);
 }
 
@@ -450,7 +450,7 @@ code {
 .plan-card {
   padding: 1rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid hsl(var(--border));
   background: var(--surface-2);
   display: flex;
   flex-direction: column;
@@ -479,8 +479,73 @@ code {
   flex: 1;
 }
 
+.plan-feature-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.45;
+}
+
+.plan-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
 .plan-current-badge {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--accent);
+}
+
+.linked-accounts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.linked-account-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.35);
+}
+
+.linked-account-active {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+.linked-account-active input {
+  margin-top: 0.2rem;
+}
+
+.form-actions-wrap {
+  margin-top: 0.25rem;
+}
+
+.form-row-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.form-row-inline .flex-grow {
+  flex: 1;
+  min-width: 12rem;
 }

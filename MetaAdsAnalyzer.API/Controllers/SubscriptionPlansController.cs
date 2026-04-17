@@ -1,5 +1,7 @@
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
+using MetaAdsAnalyzer.API.Services;
+using MetaAdsAnalyzer.Core.Subscription;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +40,9 @@ public class SubscriptionPlansController : ControllerBase
                     Currency = p.Currency,
                     SortOrder = p.SortOrder,
                     UpdatedAt = p.UpdatedAt,
+                    AllowsPdfExport = p.AllowsPdfExport,
+                    AllowsWatchlist = p.AllowsWatchlist,
+                    MaxLinkedMetaAdAccounts = p.MaxLinkedMetaAdAccounts,
                 })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -80,7 +85,11 @@ public class SubscriptionPlansController : ControllerBase
         }
 
         user.SubscriptionPlanId = plan.Id;
+        user.SubscriptionStatus = SubscriptionStatuses.Active;
+        user.PlanExpiresAt = null;
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await LinkedMetaAdAccountTrimHelper.EnforcePlanLimitAsync(_db, uid.Value, cancellationToken)
+            .ConfigureAwait(false);
         return NoContent();
     }
 }

@@ -1,3 +1,4 @@
+using MetaAdsAnalyzer.API.Extensions;
 using MetaAdsAnalyzer.Core.Entities;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -26,13 +27,19 @@ public sealed class DirectiveEngineService : IDirectiveEngineService
             throw new InvalidOperationException($"Kullanıcı bulunamadı: {userId}");
         }
 
+        var activeMeta = await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.MetaAdAccountId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
         await _db.Directives
             .Where(d => d.UserId == userId && d.IsActive)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.IsActive, false), cancellationToken)
             .ConfigureAwait(false);
 
         var raws = await _db.RawInsights.AsNoTracking()
-            .Where(r => r.UserId == userId)
+            .ForUserActiveAdAccount(userId, activeMeta)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 

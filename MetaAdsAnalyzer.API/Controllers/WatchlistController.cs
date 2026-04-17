@@ -1,3 +1,4 @@
+using MetaAdsAnalyzer.API.Extensions;
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
 using MetaAdsAnalyzer.Core.Entities;
@@ -27,6 +28,23 @@ public class WatchlistController : ControllerBase
         if (userId is null)
         {
             return Unauthorized();
+        }
+
+        var ent = await _db.GetPlanEntitlementsForUserAsync(userId.Value, cancellationToken).ConfigureAwait(false);
+        if (ent is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!ent.AllowsWatchlist)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    message = "Takip listesi Pro planda. Ayarlar üzerinden Pro’ya geçebilirsiniz.",
+                    requiredPlanCode = "pro",
+                });
         }
 
         var list = await _db.WatchlistItems.AsNoTracking()
@@ -60,6 +78,23 @@ public class WatchlistController : ControllerBase
         if (userId is null)
         {
             return Unauthorized();
+        }
+
+        var ent = await _db.GetPlanEntitlementsForUserAsync(userId.Value, cancellationToken).ConfigureAwait(false);
+        if (ent is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!ent.AllowsWatchlist)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    message = "Takip listesi Pro planda. Ayarlar üzerinden Pro’ya geçebilirsiniz.",
+                    requiredPlanCode = "pro",
+                });
         }
 
         var level = body.Level.Trim().ToLowerInvariant();
@@ -124,6 +159,23 @@ public class WatchlistController : ControllerBase
             return Unauthorized();
         }
 
+        var ent = await _db.GetPlanEntitlementsForUserAsync(userId.Value, cancellationToken).ConfigureAwait(false);
+        if (ent is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!ent.AllowsWatchlist)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    message = "Takip listesi Pro planda. Ayarlar üzerinden Pro’ya geçebilirsiniz.",
+                    requiredPlanCode = "pro",
+                });
+        }
+
         var level = body.Level.Trim().ToLowerInvariant();
         var entityId = body.EntityId.Trim();
         if (entityId.Length == 0)
@@ -163,6 +215,23 @@ public class WatchlistController : ControllerBase
         if (userId is null)
         {
             return Unauthorized();
+        }
+
+        var ent = await _db.GetPlanEntitlementsForUserAsync(userId.Value, cancellationToken).ConfigureAwait(false);
+        if (ent is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!ent.AllowsWatchlist)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    message = "Takip listesi Pro planda. Ayarlar üzerinden Pro’ya geçebilirsiniz.",
+                    requiredPlanCode = "pro",
+                });
         }
 
         var item = await _db.WatchlistItems

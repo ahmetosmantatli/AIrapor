@@ -13,6 +13,7 @@ import type {
   ProductResponse,
   RawInsightRow,
   SubscriptionPlan,
+  LinkedMetaAdAccountItem,
   UserProfile,
   WatchlistItem,
   WatchlistToggleResult,
@@ -69,6 +70,16 @@ export async function postSelectMyPlan(planCode: 'standard' | 'pro'): Promise<vo
     body: JSON.stringify({ planCode }),
   })
   if (!res.ok) throw new Error(await parseError(res))
+}
+
+export type BillingCheckoutResponse = {
+  checkoutUrl: string
+}
+
+export async function postBillingCheckout(
+  planCode: 'standard' | 'pro',
+): Promise<BillingCheckoutResponse> {
+  return postJson<BillingCheckoutResponse>('/api/billing/checkout', { planCode })
 }
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -150,6 +161,41 @@ export async function getAdAccounts(userId: number): Promise<AdAccountItem[]> {
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json() as Promise<AdAccountItem[]>
+}
+
+export async function getLinkedMetaAdAccounts(userId: number): Promise<LinkedMetaAdAccountItem[]> {
+  const res = await authFetch(`/api/users/${userId}/meta-ad-accounts`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<LinkedMetaAdAccountItem[]>
+}
+
+export async function postLinkMetaAdAccount(
+  userId: number,
+  body: { metaAdAccountId: string; displayName?: string | null },
+): Promise<LinkedMetaAdAccountItem> {
+  return postJson<LinkedMetaAdAccountItem>(`/api/users/${userId}/meta-ad-accounts`, body)
+}
+
+export async function deleteLinkedMetaAdAccount(userId: number, linkId: number): Promise<void> {
+  const res = await authFetch(`/api/users/${userId}/meta-ad-accounts/${linkId}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+}
+
+export async function postSelectActiveMetaAdAccount(
+  userId: number,
+  metaAdAccountId: string,
+): Promise<void> {
+  const res = await authFetch(`/api/users/${userId}/meta-ad-accounts/select-active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ metaAdAccountId }),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
 }
 
 export async function getRawInsights(userId: number, level?: string): Promise<RawInsightRow[]> {

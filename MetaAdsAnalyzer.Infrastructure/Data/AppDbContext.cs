@@ -27,6 +27,8 @@ public class AppDbContext : DbContext
 
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
 
+    public DbSet<UserMetaAdAccount> UserMetaAdAccounts => Set<UserMetaAdAccount>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
