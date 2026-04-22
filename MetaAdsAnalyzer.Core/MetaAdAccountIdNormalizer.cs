@@ -13,9 +13,9 @@ public static class MetaAdAccountIdNormalizer
         var t = raw.Trim();
         if (t.StartsWith("act_", StringComparison.OrdinalIgnoreCase))
         {
-            return t;
+            return t.ToLowerInvariant();
         }
 
-        return "act_" + t;
+        return ("act_" + t).ToLowerInvariant();
     }
 }

@@ -95,14 +95,46 @@ public static class ProfitMath
         return (decimal)videoPlay3s / impressions * 100m;
     }
 
-    public static decimal? HoldRatePct(long videoPlay3s, long videoThruplay)
+    /// <summary>3 sn izlenme / erişim ×100 (thumbstop).</summary>
+    public static decimal? ThumbstopRatePct(long reach, long videoPlay3s)
+    {
+        if (reach <= 0)
+        {
+            return null;
+        }
+
+        return (decimal)videoPlay3s / reach * 100m;
+    }
+
+    /// <summary>15 sn / 3 sn ×100 (hold).</summary>
+    public static decimal? HoldRatePct(long videoPlay3s, long video15Sec)
     {
         if (videoPlay3s <= 0)
         {
             return null;
         }
 
-        return (decimal)videoThruplay / videoPlay3s * 100m;
+        return (decimal)video15Sec / videoPlay3s * 100m;
+    }
+
+    public static decimal? CompletionRatePct(long impressions, long videoP100)
+    {
+        if (impressions <= 0)
+        {
+            return null;
+        }
+
+        return (decimal)videoP100 / impressions * 100m;
+    }
+
+    public static decimal? VideoViewsPerSpend(long views, decimal spend)
+    {
+        if (spend <= 0 || views <= 0)
+        {
+            return null;
+        }
+
+        return views / spend;
     }
 
     public static decimal? MismatchRatio(decimal ctrAll, decimal ctrLink)

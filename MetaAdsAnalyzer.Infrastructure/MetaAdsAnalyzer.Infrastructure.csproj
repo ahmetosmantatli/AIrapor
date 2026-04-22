@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <!-- Pin Npgsql 8.x (latest on NuGet is 8.0.9; 8.0.11 does not exist — wrong version lets NuGet pick Npgsql 9 and breaks EF). -->
+    <PackageReference Include="Npgsql" Version="8.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
   </ItemGroup>
 

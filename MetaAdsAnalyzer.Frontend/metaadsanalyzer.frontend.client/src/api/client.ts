@@ -17,7 +17,20 @@ import type {
   UserProfile,
   WatchlistItem,
   WatchlistToggleResult,
+  MetaAdListItem,
+  MetaCampaignItem,
+  MetaAdsetItem,
+  VideoAssetRow,
+  VideoReportAggregateResponse,
 } from './types'
+
+function assertPositiveUserId(userId: number, context: string): void {
+  if (!Number.isFinite(userId) || userId <= 0) {
+    throw new Error(
+      `Geçersiz kullanıcı kimliği (${context}). Çıkış yapıp yeniden giriş yapın veya Network’te istenen URL’yi kontrol edin.`,
+    )
+  }
+}
 
 async function parseError(res: Response): Promise<string> {
   const t = await res.text()
@@ -34,7 +47,17 @@ async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   if (!headers.has('Accept')) headers.set('Accept', 'application/json')
   const t = localStorage.getItem(TOKEN_KEY)
   if (t) headers.set('Authorization', `Bearer ${t}`)
-  const res = await fetch(apiUrl(path), { ...init, headers })
+  const fullUrl = apiUrl(path)
+  const method = init?.method ?? 'GET'
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.debug('[api]', method, fullUrl)
+  }
+  const res = await fetch(fullUrl, { ...init, headers })
+  if (!res.ok && import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn('[api] HTTP', res.status, method, fullUrl)
+  }
   if (res.status === 401) {
     clearStoredSession()
     if (typeof window !== 'undefined') {
@@ -53,7 +76,15 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(await parseError(res))
+  if (!res.ok) {
+    const msg = (await parseError(res)) || res.statusText || String(res.status)
+    const fullUrl = apiUrl(path)
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.error('[api] POST failed', fullUrl, res.status, msg)
+    }
+    throw new Error(import.meta.env.DEV ? `${msg} (${fullUrl})` : msg)
+  }
   return res.json() as Promise<T>
 }
 
@@ -116,20 +147,103 @@ export async function getActiveDirectives(userId: number): Promise<DirectiveItem
   return res.json() as Promise<DirectiveItem[]>
 }
 
-export async function postMetricsRecompute(userId: number): Promise<MetricsRecomputeResult> {
-  return postJson<MetricsRecomputeResult>('/api/metrics/recompute', { userId })
+export async function postMetricsRecompute(
+  userId: number,
+  opts?: { adIds?: string[] },
+): Promise<MetricsRecomputeResult> {
+  return postJson<MetricsRecomputeResult>('/api/metrics/recompute', {
+    userId,
+    ...(opts?.adIds?.length ? { adIds: opts.adIds } : {}),
+  })
 }
 
-export async function postDirectivesEvaluate(userId: number): Promise<DirectiveEvaluateResult> {
-  return postJson<DirectiveEvaluateResult>('/api/directives/evaluate', { userId })
+export async function postDirectivesEvaluate(
+  userId: number,
+  opts?: { adIds?: string[] },
+): Promise<DirectiveEvaluateResult> {
+  return postJson<DirectiveEvaluateResult>('/api/directives/evaluate', {
+    userId,
+    ...(opts?.adIds?.length ? { adIds: opts.adIds } : {}),
+  })
 }
 
 export async function postInsightsSync(
   userId: number,
   level: string,
   datePreset: string,
+  opts?: { adId?: string; adIds?: string[]; metaAdAccountId?: string },
 ): Promise<InsightsSyncResult> {
-  return postJson<InsightsSyncResult>('/api/meta/insights/sync', { userId, level, datePreset })
+  return postJson<InsightsSyncResult>('/api/meta/insights/sync', {
+    userId,
+    level,
+    datePreset,
+    ...(opts?.adIds?.length ? { adIds: opts.adIds } : {}),
+    ...(opts?.adId ? { adId: opts.adId } : {}),
+    ...(opts?.metaAdAccountId ? { metaAdAccountId: opts.metaAdAccountId } : {}),
+  })
+}
+
+export async function getMetaCampaigns(
+  userId: number,
+  metaAdAccountId?: string,
+): Promise<MetaCampaignItem[]> {
+  assertPositiveUserId(userId, 'getMetaCampaigns')
+  const q = metaAdAccountId
+    ? `?metaAdAccountId=${encodeURIComponent(metaAdAccountId)}`
+    : ''
+  const path = `/api/meta/campaigns/${userId}${q}`
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.info('[api] getMetaCampaigns', { path, resolvedUrl: apiUrl(path), userId, metaAdAccountId })
+  }
+  const res = await authFetch(path, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<MetaCampaignItem[]>
+}
+
+export async function getMetaAdsets(
+  userId: number,
+  campaignId: string,
+  metaAdAccountId?: string,
+): Promise<MetaAdsetItem[]> {
+  assertPositiveUserId(userId, 'getMetaAdsets')
+  const params = new URLSearchParams({ campaignId })
+  if (metaAdAccountId) params.set('metaAdAccountId', metaAdAccountId)
+  const path = `/api/meta/adsets/${userId}?${params.toString()}`
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.info('[api] getMetaAdsets', { path, resolvedUrl: apiUrl(path), userId, campaignId, metaAdAccountId })
+  }
+  const res = await authFetch(path, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<MetaAdsetItem[]>
+}
+
+export async function getMetaAds(
+  userId: number,
+  metaAdAccountId?: string,
+  opts?: { campaignId?: string; adsetId?: string },
+): Promise<MetaAdListItem[]> {
+  assertPositiveUserId(userId, 'getMetaAds')
+  const params = new URLSearchParams()
+  if (metaAdAccountId) params.set('metaAdAccountId', metaAdAccountId)
+  if (opts?.campaignId) params.set('campaignId', opts.campaignId)
+  if (opts?.adsetId) params.set('adsetId', opts.adsetId)
+  const q = params.toString() ? `?${params.toString()}` : ''
+  const path = `/api/meta/ads/${userId}${q}`
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.info('[api] getMetaAds', { path, resolvedUrl: apiUrl(path), userId, metaAdAccountId, opts })
+  }
+  const res = await authFetch(path, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<MetaAdListItem[]>
 }
 
 export async function getUserProfile(userId: number): Promise<UserProfile> {
@@ -255,6 +369,46 @@ export async function downloadAnalysisPdf(): Promise<void> {
   const a = document.createElement('a')
   a.href = url
   a.download = `meta-analiz-${localStorage.getItem(USER_ID_KEY) ?? 'rapor'}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function postVideoReportAggregate(body: {
+  userId: number
+  adIds: string[]
+  metaAdAccountId?: string
+}): Promise<VideoReportAggregateResponse> {
+  return postJson<VideoReportAggregateResponse>('/api/video-report/aggregate', body)
+}
+
+export async function getVideoAssets(userId: number, metaAdAccountId?: string): Promise<VideoAssetRow[]> {
+  const q = metaAdAccountId ? `?metaAdAccountId=${encodeURIComponent(metaAdAccountId)}` : ''
+  const res = await authFetch(`/api/video-assets/by-user/${userId}${q}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<VideoAssetRow[]>
+}
+
+export async function downloadVideoReportPdf(body: {
+  userId: number
+  adIds: string[]
+  metaAdAccountId?: string
+  videoId?: string
+  displayName?: string
+}): Promise<void> {
+  const res = await authFetch('/api/reports/video.pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const vid = body.videoId?.trim() || 'video'
+  a.download = `video-rapor-${vid}.pdf`
   a.click()
   URL.revokeObjectURL(url)
 }

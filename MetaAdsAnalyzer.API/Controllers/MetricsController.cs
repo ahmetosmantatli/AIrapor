@@ -40,7 +40,10 @@ public class MetricsController : ControllerBase
 
         try
         {
-            var result = await _metrics.RecomputeForUserAsync(body.UserId, cancellationToken).ConfigureAwait(false);
+            var adIds = body.AdIds is { Count: > 0 }
+                ? (IReadOnlyList<string>?)body.AdIds
+                : null;
+            var result = await _metrics.RecomputeForUserAsync(body.UserId, adIds, cancellationToken).ConfigureAwait(false);
             return Ok(result);
         }
         catch (InvalidOperationException ex)

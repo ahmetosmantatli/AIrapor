@@ -99,6 +99,35 @@ export type AdAccountItem = {
   accountId: string | null
 }
 
+/** Graph act_…/campaigns */
+export type MetaCampaignItem = {
+  id: string
+  name: string | null
+  status: string | null
+  objective: string | null
+}
+
+/** Graph {campaignId}/adsets */
+export type MetaAdsetItem = {
+  id: string
+  name: string | null
+  status: string | null
+  campaignId: string | null
+}
+
+/** Graph act_…/ads — reklam ve isteğe bağlı video_id (performans ayrı insights ile gelir). */
+export type MetaAdListItem = {
+  id: string
+  name: string | null
+  status: string | null
+  effectiveStatus: string | null
+  creativeId: string | null
+  creativeName: string | null
+  videoId: string | null
+  videoTitle: string | null
+  thumbnailUrl: string | null
+}
+
 export type RawInsightRow = {
   id: number
   level: string
@@ -110,12 +139,55 @@ export type RawInsightRow = {
   fetchedAt: string
   spend: number
   impressions: number
+  reach: number
   linkClicks: number
+  videoPlay3s: number
+  video15Sec: number
+  videoP100: number
   purchases: number
   purchaseValue: number
   roas: number | null
   cpa: number | null
+  thumbstopRatePct: number | null
+  holdRatePct: number | null
+  completionRatePct: number | null
+  creativeScoreTotal: number | null
   computedMetricId: number | null
+}
+
+export type VideoReportAggregateResponse = {
+  spend: number
+  impressions: number
+  reach: number
+  linkClicks: number
+  purchases: number
+  purchaseValue: number
+  ctrLinkPct: number
+  linkCvrPct: number | null
+  thumbstopPct: number | null
+  holdPct: number | null
+  completionPct: number | null
+  roas: number | null
+  breakEvenRoas: number | null
+  targetRoas: number | null
+  creativeScore: number | null
+  narrativeLines: string[]
+  problemTags: string[]
+  /** Backend: ham insight yoksa false (404 yerine 200). */
+  hasInsightRows?: boolean
+  diagnosticMessage?: string | null
+}
+
+export type VideoAssetRow = {
+  videoId: string
+  thumbnailUrl: string | null
+  representativeAdName: string | null
+  totalSpend: number
+  hookRateAvg: number | null
+  holdRateAvg: number | null
+  completionRateAvg: number | null
+  totalRoas: number | null
+  problemTags: string[]
 }
 
 export type CampaignMapItem = {

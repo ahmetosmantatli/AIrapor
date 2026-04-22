@@ -3,6 +3,9 @@ namespace MetaAdsAnalyzer.API.Services;
 public sealed class DirectiveEvaluateRequestDto
 {
     public int UserId { get; set; }
+
+    /// <summary>Doluysa yalnızca bu reklam varlıkları için direktif üretilir; diğer aktif direktiflere dokunulmaz.</summary>
+    public List<string>? AdIds { get; set; }
 }
 
 public sealed class DirectiveEvaluateResultDto

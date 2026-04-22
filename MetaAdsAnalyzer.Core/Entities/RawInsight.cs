@@ -76,6 +76,15 @@ public class RawInsight
 
     public long VideoThruplay { get; set; }
 
+    /// <summary>15 sn video izlenme (Graph <c>video_15_sec_watched_actions</c> toplamı).</summary>
+    public long Video15Sec { get; set; }
+
+    /// <summary>30 sn video izlenme (Graph <c>video_30_sec_watched_actions</c>).</summary>
+    public long Video30Sec { get; set; }
+
+    /// <summary>P95 izlenme (Graph <c>video_p95_watched_actions</c>).</summary>
+    public long VideoP95 { get; set; }
+
     public long VideoP25 { get; set; }
 
     public long VideoP50 { get; set; }

@@ -29,6 +29,10 @@ public class AppDbContext : DbContext
 
     public DbSet<UserMetaAdAccount> UserMetaAdAccounts => Set<UserMetaAdAccount>();
 
+    public DbSet<AdVideoLink> AdVideoLinks => Set<AdVideoLink>();
+
+    public DbSet<VideoAsset> VideoAssets => Set<VideoAsset>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

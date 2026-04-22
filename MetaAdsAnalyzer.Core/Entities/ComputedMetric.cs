@@ -32,8 +32,25 @@ public class ComputedMetric
     [Column(TypeName = "decimal(18,6)")]
     public decimal? HookRate { get; set; }
 
+    /// <summary>3 sn izlenme / erişim ×100 (thumbstop).</summary>
+    [Column(TypeName = "decimal(18,6)")]
+    public decimal? ThumbstopRatePct { get; set; }
+
     [Column(TypeName = "decimal(18,6)")]
     public decimal? HoldRate { get; set; }
+
+    /// <summary>P100 / gösterim ×100.</summary>
+    [Column(TypeName = "decimal(18,6)")]
+    public decimal? CompletionRatePct { get; set; }
+
+    [Column(TypeName = "decimal(18,6)")]
+    public decimal? Video3SecPerSpend { get; set; }
+
+    [Column(TypeName = "decimal(18,6)")]
+    public decimal? Video15SecPerSpend { get; set; }
+
+    /// <summary>0–100 kreatif skor (hook/hold/completion/roas ağırlıklı).</summary>
+    public int? CreativeScoreTotal { get; set; }
 
     [Column(TypeName = "decimal(18,4)")]
     public decimal? NetProfitPerOrder { get; set; }

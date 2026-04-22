@@ -1,5 +1,5 @@
 import {
-  BarChart3,
+  Clapperboard,
   ImageIcon,
   LayoutDashboard,
   LayoutGrid,
@@ -7,7 +7,6 @@ import {
   LogOut,
   Package,
   Settings,
-  Wrench,
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -15,20 +14,25 @@ import { useUser } from '../context/UserContext'
 
 const nav = [
   { to: '/app', label: 'Özet', end: true, icon: LayoutDashboard },
-  { to: '/app/analysis', label: 'Analiz', icon: BarChart3 },
+  { to: '/app/video-report', label: 'AI Video Rapor', icon: Clapperboard },
   { to: '/app/creatives', label: 'Kreatif', icon: ImageIcon },
   { to: '/app/products', label: 'Ürünler', icon: Package },
   { to: '/app/campaigns', label: 'Kampanyalar', icon: LayoutGrid },
   { to: '/app/settings', label: 'Ayarlar', icon: Settings },
-  { to: '/app/tools', label: 'Araçlar', icon: Wrench },
   { to: '/connect', label: 'Meta', icon: Link2 },
 ]
+
+const titleByPath: Record<string, string> = {
+  '/app/analysis': 'Analiz',
+  '/app/tools': 'Araçlar',
+}
 
 export function Layout() {
   const { email, logout } = useUser()
   const navigate = useNavigate()
   const location = useLocation()
   const title =
+    titleByPath[location.pathname] ??
     nav.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)))?.label ??
     'Portal'
 

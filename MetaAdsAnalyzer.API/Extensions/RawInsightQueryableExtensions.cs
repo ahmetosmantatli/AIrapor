@@ -18,6 +18,6 @@ public static class RawInsightQueryableExtensions
             return q.Where(r => r.MetaAdAccountId == null);
         }
 
-        return q.Where(r => r.MetaAdAccountId == act);
+        return q.Where(r => r.MetaAdAccountId != null && r.MetaAdAccountId.ToLower() == act.ToLower());
     }
 }

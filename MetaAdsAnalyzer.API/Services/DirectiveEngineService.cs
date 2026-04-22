@@ -18,6 +18,7 @@ public sealed class DirectiveEngineService : IDirectiveEngineService
 
     public async Task<DirectiveEvaluateResultDto> EvaluateForUserAsync(
         int userId,
+        IReadOnlyList<string>? adEntityIds = null,
         CancellationToken cancellationToken = default)
     {
         var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, cancellationToken)
@@ -33,15 +34,31 @@ public sealed class DirectiveEngineService : IDirectiveEngineService
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        await _db.Directives
-            .Where(d => d.UserId == userId && d.IsActive)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.IsActive, false), cancellationToken)
-            .ConfigureAwait(false);
+        if (adEntityIds is { Count: > 0 })
+        {
+            var set = adEntityIds.ToHashSet(StringComparer.Ordinal);
+            await _db.Directives
+                .Where(
+                    d => d.UserId == userId && d.IsActive && d.EntityType == "ad" && set.Contains(d.EntityId))
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.IsActive, false), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            await _db.Directives
+                .Where(d => d.UserId == userId && d.IsActive)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.IsActive, false), cancellationToken)
+                .ConfigureAwait(false);
+        }
 
-        var raws = await _db.RawInsights.AsNoTracking()
-            .ForUserActiveAdAccount(userId, activeMeta)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var rawQ = _db.RawInsights.AsNoTracking().ForUserActiveAdAccount(userId, activeMeta);
+        if (adEntityIds is { Count: > 0 })
+        {
+            var set = adEntityIds.ToHashSet(StringComparer.Ordinal);
+            rawQ = rawQ.Where(r => r.Level == "ad" && set.Contains(r.EntityId));
+        }
+
+        var raws = await rawQ.ToListAsync(cancellationToken).ConfigureAwait(false);
 
         if (raws.Count == 0)
         {

@@ -21,6 +21,7 @@ public sealed class MetaOptions
 
     public string ApiVersion { get; set; } = "v19.0";
 
-    /// <summary>Virgülle ayrılmış izinler (örn. email,public_profile,ads_read).</summary>
-    public string Scopes { get; set; } = "email,public_profile,ads_read";
+    /// <summary>Virgülle ayrılmış OAuth izinleri (OAuth ile otomatik istenir).</summary>
+    public string Scopes { get; set; } =
+        "public_profile,ads_read,ads_management,business_management";
 }

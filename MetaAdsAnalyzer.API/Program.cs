@@ -69,6 +69,8 @@ builder.Services.AddScoped<IStripeBillingService, StripeBillingService>();
 
 builder.Services.AddScoped<IMetricsComputationService, MetricsComputationService>();
 builder.Services.AddScoped<IDirectiveEngineService, DirectiveEngineService>();
+builder.Services.AddScoped<IVideoAssetSyncService, VideoAssetSyncService>();
+builder.Services.AddScoped<IVideoReportInsightService, VideoReportInsightService>();
 
 builder.Services.AddHostedService<MetaInsightsSchedulingService>();
 
@@ -150,9 +152,40 @@ app.UseStaticFiles();
 app.MapControllers();
 
 var indexHtml = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "index.html");
-if (File.Exists(indexHtml))
-{
-    app.MapFallbackToFile("index.html");
-}
+// wwwroot/index.html olmasa bile: yanlış /api/* için JSON 404 (boş Content-Length yerine teşhis gövdesi).
+// Doğru rota MapControllers ile eşleşir; buraya sadece hiçbir endpoint tutmayan istekler düşer.
+app.MapFallback(
+    async context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response
+                .WriteAsJsonAsync(
+                    new
+                    {
+                        message =
+                            "API yolu bulunamadı. Çalışan proje MetaAdsAnalyzer.API olmalı; Swagger’da rota var mı bakın. " +
+                            "Yaygın nedenler: yanlış URL, eski API derlemesi, veya istemcide çift /api/api/ (VITE_API_BASE_URL sonu /api olmamalı; .env.example’e bakın). " +
+                            "Örnek: GET /api/video-report/route-ping (JWT gerekmez), POST /api/video-report/aggregate.",
+                        path = context.Request.Path.Value,
+                        method = context.Request.Method,
+                    },
+                    cancellationToken: context.RequestAborted)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (File.Exists(indexHtml))
+        {
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.SendFileAsync(indexHtml).ConfigureAwait(false);
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        await context.Response.WriteAsync("Not found", cancellationToken: context.RequestAborted).ConfigureAwait(false);
+    });
 
 app.Run();

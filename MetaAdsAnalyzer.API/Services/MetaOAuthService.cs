@@ -64,17 +64,20 @@ public sealed class MetaOAuthService : IMetaOAuthService
             throw new InvalidOperationException("Meta /me yanıtında kullanıcı kimliği yok.");
         }
 
-        if (string.IsNullOrWhiteSpace(profile.Email))
+        var email = profile.Email?.Trim();
+        if (string.IsNullOrEmpty(email))
         {
-            throw new InvalidOperationException(
-                "Facebook e-posta adresi dönmedi. Uygulama izinlerinde e-posta kapsamını ve uygulama incelemesini kontrol edin.");
+            // Meta çoğu uygulama türünde `email` scope'u vermez veya App Review gerektirir.
+            // Reklam analizi için zorunlu değil; kullanıcıyı benzersiz yer tutucu e-posta ile oluştururuz.
+            email = $"meta-{profile.Id}@oauth.metaadsanalyzer.local";
+            _logger.LogInformation("Meta /me e-posta dönmedi; yer tutucu kullanılıyor: {Email}", email);
         }
 
         var expiresAt = longLived.ExpiresIn is > 0
             ? DateTimeOffset.UtcNow.AddSeconds(longLived.ExpiresIn.Value)
             : (DateTimeOffset?)null;
 
-        return new MetaOAuthResult(longLived.AccessToken, expiresAt, profile.Id, profile.Email);
+        return new MetaOAuthResult(longLived.AccessToken, expiresAt, profile.Id, email);
     }
 
     public async Task<MetaAccessTokenResult> RefreshLongLivedTokenAsync(

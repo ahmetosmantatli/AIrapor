@@ -22,7 +22,15 @@ public sealed class RawInsightListRowDto
 
     public long Impressions { get; set; }
 
+    public long Reach { get; set; }
+
     public long LinkClicks { get; set; }
+
+    public long VideoPlay3s { get; set; }
+
+    public long Video15Sec { get; set; }
+
+    public long VideoP100 { get; set; }
 
     public long Purchases { get; set; }
 
@@ -31,6 +39,14 @@ public sealed class RawInsightListRowDto
     public decimal? Roas { get; set; }
 
     public decimal? Cpa { get; set; }
+
+    public decimal? ThumbstopRatePct { get; set; }
+
+    public decimal? HoldRatePct { get; set; }
+
+    public decimal? CompletionRatePct { get; set; }
+
+    public int? CreativeScoreTotal { get; set; }
 
     public int? ComputedMetricId { get; set; }
 }

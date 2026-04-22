@@ -20,6 +20,7 @@ public class MetaAuthController : ControllerBase
     private readonly IMetaOAuthService _metaOAuth;
     private readonly IMetaAccessTokenProtector _tokenProtector;
     private readonly IJwtTokenService _jwt;
+    private readonly IMetaInsightsSyncService _metaInsights;
     private readonly MetaOptions _metaOptions;
     private readonly ILogger<MetaAuthController> _logger;
 
@@ -28,6 +29,7 @@ public class MetaAuthController : ControllerBase
         IMetaOAuthService metaOAuth,
         IMetaAccessTokenProtector tokenProtector,
         IJwtTokenService jwt,
+        IMetaInsightsSyncService metaInsights,
         IOptions<MetaOptions> metaOptions,
         ILogger<MetaAuthController> logger)
     {
@@ -35,6 +37,7 @@ public class MetaAuthController : ControllerBase
         _metaOAuth = metaOAuth;
         _tokenProtector = tokenProtector;
         _jwt = jwt;
+        _metaInsights = metaInsights;
         _metaOptions = metaOptions.Value;
         _logger = logger;
     }
@@ -104,6 +107,15 @@ public class MetaAuthController : ControllerBase
         {
             var result = await _metaOAuth.CompleteAuthorizationAsync(code, cancellationToken).ConfigureAwait(false);
             var user = await UpsertUserAsync(result, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await _metaInsights.SyncLinkedAdAccountsFromGraphAsync(user.Id, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception syncEx)
+            {
+                _logger.LogWarning(syncEx, "OAuth sonrası reklam hesapları veritabanına yazılamadı UserId={UserId}", user.Id);
+            }
+
             string? accessToken = null;
             try
             {

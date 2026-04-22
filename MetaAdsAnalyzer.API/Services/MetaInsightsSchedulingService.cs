@@ -137,7 +137,7 @@ public sealed class MetaInsightsSchedulingService : BackgroundService
 
                 try
                 {
-                    await sync.SyncInsightsAsync(userId, level.Trim(), datePreset, ct).ConfigureAwait(false);
+                    await sync.SyncInsightsAsync(userId, level.Trim(), datePreset, null, null, null, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

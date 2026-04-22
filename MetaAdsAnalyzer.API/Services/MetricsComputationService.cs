@@ -18,6 +18,7 @@ public sealed class MetricsComputationService : IMetricsComputationService
 
     public async Task<MetricsRecomputeResultDto> RecomputeForUserAsync(
         int userId,
+        IReadOnlyList<string>? adEntityIds = null,
         CancellationToken cancellationToken = default)
     {
         var result = new MetricsRecomputeResultDto();
@@ -34,11 +35,14 @@ public sealed class MetricsComputationService : IMetricsComputationService
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var rawIds = await _db.RawInsights.AsNoTracking()
-            .ForUserActiveAdAccount(userId, activeMeta)
-            .Select(r => r.Id)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var rawQ = _db.RawInsights.AsNoTracking().ForUserActiveAdAccount(userId, activeMeta);
+        if (adEntityIds is { Count: > 0 })
+        {
+            var set = adEntityIds.ToHashSet(StringComparer.Ordinal);
+            rawQ = rawQ.Where(r => r.Level == "ad" && set.Contains(r.EntityId));
+        }
+
+        var rawIds = await rawQ.Select(r => r.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         if (rawIds.Count > 0)
         {
@@ -116,12 +120,40 @@ public sealed class MetricsComputationService : IMetricsComputationService
 
         if (map?.Product is null)
         {
-            aggregate.SkippedNoCampaignMap++;
-            _logger.LogDebug(
-                "Hesap atlandı RawInsight {Id}: kampanya {Campaign} için ürün eşlemesi yok.",
-                rawInsightId,
-                campaignKey);
-            return false;
+            var hookFallback = ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
+            var thumbFallback = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s);
+            var holdFallback = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+            var completionFallback = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
+            var v3f = ProfitMath.VideoViewsPerSpend(raw.VideoPlay3s, raw.Spend);
+            var v15f = ProfitMath.VideoViewsPerSpend(raw.Video15Sec, raw.Spend);
+            var mismatchFallback = ProfitMath.MismatchRatio(raw.CtrAll, raw.CtrLink);
+            var roasFallback = ProfitMath.Roas(raw.PurchaseValue, 1m, raw.Spend);
+            var cpaFallback = ProfitMath.Cpa(raw.Spend, raw.Purchases);
+
+            var cm0 = new ComputedMetric
+            {
+                RawInsightId = rawInsightId,
+                Roas = roasFallback,
+                Cpa = cpaFallback,
+                BreakEvenRoas = null,
+                TargetRoas = null,
+                MaxCpa = null,
+                TargetCpa = null,
+                HookRate = hookFallback,
+                ThumbstopRatePct = thumbFallback,
+                HoldRate = holdFallback,
+                CompletionRatePct = completionFallback,
+                Video3SecPerSpend = v3f,
+                Video15SecPerSpend = v15f,
+                NetProfitPerOrder = null,
+                NetMarginPct = null,
+                MismatchRatio = mismatchFallback,
+                ComputedAt = DateTimeOffset.UtcNow,
+            };
+            cm0.CreativeScoreTotal = AdCreativeScore.Compute(raw, cm0).Score;
+            _db.ComputedMetrics.Add(cm0);
+
+            return true;
         }
 
         var p = map.Product;
@@ -141,26 +173,35 @@ public sealed class MetricsComputationService : IMetricsComputationService
         var netPerOrder = ProfitMath.NetProfitPerOrder(cm, cpa);
         var netMarginPct = ProfitMath.NetMarginPct(netPerOrder, p.SellingPrice);
         var hook = ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
-        var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.VideoThruplay);
+        var thumb = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s);
+        var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+        var completion = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
+        var v3 = ProfitMath.VideoViewsPerSpend(raw.VideoPlay3s, raw.Spend);
+        var v15 = ProfitMath.VideoViewsPerSpend(raw.Video15Sec, raw.Spend);
         var mismatch = ProfitMath.MismatchRatio(raw.CtrAll, raw.CtrLink);
 
-        _db.ComputedMetrics.Add(
-            new ComputedMetric
-            {
-                RawInsightId = rawInsightId,
-                Roas = roas,
-                Cpa = cpa,
-                BreakEvenRoas = breakEvenRoas,
-                TargetRoas = targetRoas,
-                MaxCpa = maxCpa,
-                TargetCpa = targetCpa,
-                HookRate = hook,
-                HoldRate = hold,
-                NetProfitPerOrder = netPerOrder,
-                NetMarginPct = netMarginPct,
-                MismatchRatio = mismatch,
-                ComputedAt = DateTimeOffset.UtcNow,
-            });
+        var cm1 = new ComputedMetric
+        {
+            RawInsightId = rawInsightId,
+            Roas = roas,
+            Cpa = cpa,
+            BreakEvenRoas = breakEvenRoas,
+            TargetRoas = targetRoas,
+            MaxCpa = maxCpa,
+            TargetCpa = targetCpa,
+            HookRate = hook,
+            ThumbstopRatePct = thumb,
+            HoldRate = hold,
+            CompletionRatePct = completion,
+            Video3SecPerSpend = v3,
+            Video15SecPerSpend = v15,
+            NetProfitPerOrder = netPerOrder,
+            NetMarginPct = netMarginPct,
+            MismatchRatio = mismatch,
+            ComputedAt = DateTimeOffset.UtcNow,
+        };
+        cm1.CreativeScoreTotal = AdCreativeScore.Compute(raw, cm1).Score;
+        _db.ComputedMetrics.Add(cm1);
 
         return true;
     }

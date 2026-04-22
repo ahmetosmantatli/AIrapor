@@ -6,25 +6,28 @@ public static class AdCreativeScore
 {
     public static (int Score, string Health) Compute(RawInsight raw, ComputedMetric m)
     {
-        var hook = ScoreFromHook(m.HookRate);
-        var conv = ScoreFromConversion(m.Roas, m.TargetRoas, m.BreakEvenRoas, raw);
-        var profit = ScoreFromNetMargin(m.NetMarginPct);
+        var hook = ScoreFromThumbstop(m.ThumbstopRatePct ?? m.HookRate);
+        var hold = ScoreFromHold(m.HoldRate);
+        var completion = ScoreFromCompletion(m.CompletionRatePct);
+        var roasPart = ScoreFromConversion(m.Roas, m.TargetRoas, m.BreakEvenRoas, raw);
 
-        var total = (int)Math.Round(hook * 0.3m + conv * 0.4m + profit * 0.3m, MidpointRounding.AwayFromZero);
+        var total = (int)Math.Round(
+            hook * 0.3m + hold * 0.25m + completion * 0.15m + roasPart * 0.3m,
+            MidpointRounding.AwayFromZero);
         total = Math.Clamp(total, 0, 100);
 
         var health = ClassifyHealth(total, m, raw);
         return (total, health);
     }
 
-    private static decimal ScoreFromHook(decimal? hookRatePct)
+    private static decimal ScoreFromThumbstop(decimal? thumbOrHookPct)
     {
-        if (hookRatePct is null)
+        if (thumbOrHookPct is null)
         {
             return 50m;
         }
 
-        var h = hookRatePct.Value;
+        var h = thumbOrHookPct.Value;
         if (h >= DirectiveThresholds.HookGoodPct)
         {
             return 100m;
@@ -33,6 +36,48 @@ public static class AdCreativeScore
         if (h >= DirectiveThresholds.HookPoorPct)
         {
             return 60m;
+        }
+
+        return 25m;
+    }
+
+    private static decimal ScoreFromHold(decimal? holdPct)
+    {
+        if (holdPct is null)
+        {
+            return 50m;
+        }
+
+        var h = holdPct.Value;
+        if (h >= 40m)
+        {
+            return 100m;
+        }
+
+        if (h >= DirectiveThresholds.HoldPoorPct)
+        {
+            return 65m;
+        }
+
+        return 25m;
+    }
+
+    private static decimal ScoreFromCompletion(decimal? completionPct)
+    {
+        if (completionPct is null)
+        {
+            return 50m;
+        }
+
+        var c = completionPct.Value;
+        if (c >= 15m)
+        {
+            return 100m;
+        }
+
+        if (c >= 5m)
+        {
+            return 65m;
         }
 
         return 25m;
@@ -73,32 +118,6 @@ public static class AdCreativeScore
         }
 
         return Math.Clamp(55m * ratioToTarget, 10m, 90m);
-    }
-
-    private static decimal ScoreFromNetMargin(decimal? netMarginPct)
-    {
-        if (netMarginPct is null)
-        {
-            return 45m;
-        }
-
-        var n = netMarginPct.Value;
-        if (n >= 15m)
-        {
-            return 100m;
-        }
-
-        if (n >= 5m)
-        {
-            return 70m;
-        }
-
-        if (n >= 0m)
-        {
-            return 45m;
-        }
-
-        return 15m;
     }
 
     private static string ClassifyHealth(int score, ComputedMetric m, RawInsight raw)

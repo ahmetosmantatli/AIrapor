@@ -216,7 +216,9 @@ internal static class DirectiveRules
                 score,
                 healthLocal));
 
-        if (m.HookRate is < DirectiveThresholds.HookPoorPct)
+        var hookVal = m.ThumbstopRatePct ?? m.HookRate;
+
+        if (hookVal is < DirectiveThresholds.HookPoorPct)
         {
             list.Add(
                 Dir(
@@ -230,7 +232,7 @@ internal static class DirectiveRules
                     healthLocal));
         }
 
-        if (m.HoldRate is < DirectiveThresholds.HoldPoorPct && (m.HookRate is null or >= DirectiveThresholds.HookPoorPct))
+        if (m.HoldRate is < DirectiveThresholds.HoldPoorPct && (hookVal is null or >= DirectiveThresholds.HookPoorPct))
         {
             list.Add(
                 Dir(
@@ -244,7 +246,7 @@ internal static class DirectiveRules
                     healthLocal));
         }
 
-        if (raw.CtrLink < DirectiveThresholds.CtrLowPct && m.HookRate is >= DirectiveThresholds.HookGoodPct)
+        if (raw.CtrLink < DirectiveThresholds.CtrLowPct && hookVal is >= DirectiveThresholds.HookGoodPct)
         {
             list.Add(
                 Dir(

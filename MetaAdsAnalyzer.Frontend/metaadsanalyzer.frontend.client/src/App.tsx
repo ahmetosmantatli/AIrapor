@@ -14,6 +14,7 @@ import { ProductsSetup } from './pages/ProductsSetup'
 import { Register } from './pages/Register'
 import { Settings } from './pages/Settings'
 import { Tools } from './pages/Tools'
+import { VideoReport } from './pages/VideoReport'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/app" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="analysis" element={<Analysis />} />
+              <Route path="video-report" element={<VideoReport />} />
               <Route path="creatives" element={<Creatives />} />
               <Route path="products" element={<ProductsSetup />} />
               <Route path="campaigns" element={<CampaignMaps />} />
