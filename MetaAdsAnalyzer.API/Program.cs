@@ -22,6 +22,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddMemoryCache();
 builder.Services.AddDataProtection();
 builder.Services.AddSingleton<IMetaAccessTokenProtector, MetaAccessTokenProtector>();
 

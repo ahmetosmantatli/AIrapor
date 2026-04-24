@@ -5,6 +5,7 @@ using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace MetaAdsAnalyzer.API.Controllers;
@@ -23,6 +24,7 @@ public class MetaAuthController : ControllerBase
     private readonly IMetaInsightsSyncService _metaInsights;
     private readonly MetaOptions _metaOptions;
     private readonly ILogger<MetaAuthController> _logger;
+    private readonly IMemoryCache _oauthStateCache;
 
     public MetaAuthController(
         AppDbContext db,
@@ -31,6 +33,7 @@ public class MetaAuthController : ControllerBase
         IJwtTokenService jwt,
         IMetaInsightsSyncService metaInsights,
         IOptions<MetaOptions> metaOptions,
+        IMemoryCache oauthStateCache,
         ILogger<MetaAuthController> logger)
     {
         _db = db;
@@ -39,6 +42,7 @@ public class MetaAuthController : ControllerBase
         _jwt = jwt;
         _metaInsights = metaInsights;
         _metaOptions = metaOptions.Value;
+        _oauthStateCache = oauthStateCache;
         _logger = logger;
     }
 
@@ -55,6 +59,13 @@ public class MetaAuthController : ControllerBase
         }
 
         var state = Guid.NewGuid().ToString("N");
+        // Sunucu tarafı state: Facebook dönüşünde bazı tarayıcılar / uygulama-içi WebView
+        // çerezi göndermeyebilir; cookie yalnızca ek doğrulama olarak kalır.
+        _oauthStateCache.Set(
+            CacheKeyForState(state),
+            true,
+            new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) });
+
         Response.Cookies.Append(
             StateCookieName,
             state,
@@ -95,12 +106,19 @@ public class MetaAuthController : ControllerBase
             return Redirect(AppendQuery(redirectBase, "meta_oauth", "invalid_request", "code veya state eksik."));
         }
 
-        if (!Request.Cookies.TryGetValue(StateCookieName, out var cookieState) ||
-            !string.Equals(cookieState, state, StringComparison.Ordinal))
+        var cacheKey = CacheKeyForState(state);
+        if (!_oauthStateCache.TryGetValue(cacheKey, out _))
         {
-            return Redirect(AppendQuery(redirectBase, "meta_oauth", "invalid_state", "Oturum doğrulanamadı. Tekrar deneyin."));
+            if (!Request.Cookies.TryGetValue(StateCookieName, out var cookieState) ||
+                !string.Equals(cookieState, state, StringComparison.Ordinal))
+            {
+                _logger.LogWarning("Meta OAuth state doğrulanamadı (önbellek ve çerez uyuşmadı).");
+                return Redirect(
+                    AppendQuery(redirectBase, "meta_oauth", "invalid_state", "Oturum doğrulanamadı. Tekrar deneyin."));
+            }
         }
 
+        _oauthStateCache.Remove(cacheKey);
         Response.Cookies.Delete(StateCookieName, new CookieOptions { Path = "/" });
 
         try
@@ -215,4 +233,6 @@ public class MetaAuthController : ControllerBase
 
         return uri;
     }
+
+    private static string CacheKeyForState(string state) => $"meta_oauth_state:{state}";
 }

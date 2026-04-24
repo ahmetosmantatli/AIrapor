@@ -67,6 +67,10 @@ export function Register() {
         <p className="muted small">
           Zaten hesabınız var mı? <Link to="/login">Giriş</Link>
         </p>
+        <p className="muted small">
+          Facebook ile giriş için <Link to="/connect">Meta ile bağlan</Link> sayfasını kullanın; bu sayfa yalnızca
+          e-posta ile kayıt içindir.
+        </p>
       </form>
     </div>
   )
