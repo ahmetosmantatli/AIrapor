@@ -8,6 +8,12 @@ namespace MetaAdsAnalyzer.Infrastructure.Data;
 /// anahtar=değer bağlantı dizesine çevirir. Render vb. ortamlarda env değerindeki <c>sslmode=require</c>
 /// içindeki <c>=</c> karakterinin kesilmesi sorununu da aşmak için tercih edilir.
 /// </summary>
+/// <remarks>
+/// Render yalnızca IPv4 çıkışı kullanır; Supabase <b>doğrudan</b> <c>db.*.supabase.co</c> adresi çoğu projede
+/// yalnızca IPv6’dır — bu durumda Dashboard → Connect → <b>Session pooler</b> (Supavisor, port 5432,
+/// kullanıcı <c>postgres.PROJECT_REF</c>) dizesini kullanın. Ayrıntı:
+/// https://supabase.com/docs/guides/database/connecting-to-postgres
+/// </remarks>
 public static class PostgreSqlConnectionStringNormalizer
 {
     public static string Normalize(string connectionString)
