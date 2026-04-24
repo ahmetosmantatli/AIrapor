@@ -52,6 +52,20 @@ public class ComputedMetric
     /// <summary>0–100 kreatif skor (hook/hold/completion/roas ağırlıklı).</summary>
     public int? CreativeScoreTotal { get; set; }
 
+    /// <summary>Skor etiketi: Winner | Potansiyel | Zayıf | Kapat.</summary>
+    [Column(TypeName = "character varying(32)")]
+    public string? CreativeScoreLabel { get; set; }
+
+    /// <summary>Skor rengi: green | blue | orange | red.</summary>
+    [Column(TypeName = "character varying(16)")]
+    public string? CreativeScoreColor { get; set; }
+
+    /// <summary>Video kreatif tespiti (video_id/eşleşme varsa true).</summary>
+    public bool IsVideoCreative { get; set; }
+
+    /// <summary>Video modeli seçildi fakat oynatma metrikleri yoksa true.</summary>
+    public bool VideoMetricsUnavailable { get; set; }
+
     [Column(TypeName = "decimal(18,4)")]
     public decimal? NetProfitPerOrder { get; set; }
 

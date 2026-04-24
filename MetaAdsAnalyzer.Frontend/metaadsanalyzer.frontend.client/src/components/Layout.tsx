@@ -1,6 +1,9 @@
 import {
+  BarChart3,
+  Building2,
   Clapperboard,
   ImageIcon,
+  Activity,
   LayoutDashboard,
   LayoutGrid,
   Link2,
@@ -12,9 +15,17 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { Button } from '@/components/ui/button'
 import { useUser } from '../context/UserContext'
 
-const nav = [
-  { to: '/app', label: 'Özet', end: true, icon: LayoutDashboard },
+const nav: Array<{
+  to: string
+  label: string
+  icon: typeof LayoutDashboard
+  end?: boolean
+}> = [
+  { to: '/app/accounts', label: 'Reklam hesapları', icon: Building2 },
+  { to: '/app/dashboard', label: 'Özet', icon: LayoutDashboard },
   { to: '/app/video-report', label: 'AI Video Rapor', icon: Clapperboard },
+  { to: '/app/analyzed-ads', label: 'Analiz edilen reklamlar', icon: BarChart3 },
+  { to: '/app/impact-tracking', label: 'Etki Takibi', icon: Activity },
   { to: '/app/creatives', label: 'Kreatif', icon: ImageIcon },
   { to: '/app/products', label: 'Ürünler', icon: Package },
   { to: '/app/campaigns', label: 'Kampanyalar', icon: LayoutGrid },

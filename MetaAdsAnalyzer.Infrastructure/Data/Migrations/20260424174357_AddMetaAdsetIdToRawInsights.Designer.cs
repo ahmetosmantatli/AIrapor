@@ -3,6 +3,7 @@ using System;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424174357_AddMetaAdsetIdToRawInsights")]
+    partial class AddMetaAdsetIdToRawInsights
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -424,173 +427,6 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.ToTable("raw_insights");
                 });
 
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SavedReport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AdId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("AdName")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<string>("AdsetId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("AdsetName")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<decimal?>("AggregateHoldRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("AggregateHookRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<int?>("AggregatePurchases")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("AggregateRoas")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("AggregateSpend")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<DateTimeOffset>("AnalyzedAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<string>("CampaignId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("CampaignName")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.Property<string>("ThumbnailUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "AdId", "AnalyzedAt");
-
-                    b.ToTable("saved_reports");
-                });
-
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SavedReportSuggestion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Action")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<decimal?>("AfterHoldRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("AfterHookRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<int?>("AfterPurchases")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("AfterRoas")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("AfterSpend")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<DateTimeOffset?>("AppliedAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<decimal?>("BeforeHoldRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("BeforeHookRate")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<int?>("BeforePurchases")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("BeforeRoas")
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<decimal?>("BeforeSpend")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<string>("DirectiveType")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTimeOffset?>("ImpactMeasuredAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<bool>("MetaChangeDetected")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MetaChangeMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<int>("SavedReportId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTimeOffset?>("SkippedAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<string>("SuggestionKey")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("Symptom")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppliedAt", "ImpactMeasuredAt");
-
-                    b.HasIndex("SavedReportId", "SuggestionKey")
-                        .IsUnique();
-
-                    b.ToTable("saved_report_suggestions");
-                });
-
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", b =>
                 {
                     b.Property<int>("Id")
@@ -972,28 +808,6 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SavedReport", b =>
-                {
-                    b.HasOne("MetaAdsAnalyzer.Core.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SavedReportSuggestion", b =>
-                {
-                    b.HasOne("MetaAdsAnalyzer.Core.Entities.SavedReport", "SavedReport")
-                        .WithMany("Suggestions")
-                        .HasForeignKey("SavedReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("SavedReport");
-                });
-
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.User", b =>
                 {
                     b.HasOne("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", "SubscriptionPlan")
@@ -1046,11 +860,6 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.RawInsight", b =>
                 {
                     b.Navigation("ComputedMetrics");
-                });
-
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SavedReport", b =>
-                {
-                    b.Navigation("Suggestions");
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.SubscriptionPlan", b =>

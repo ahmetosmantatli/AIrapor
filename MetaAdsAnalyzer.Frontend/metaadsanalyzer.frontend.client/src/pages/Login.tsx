@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { loginAccount } from '../api/client'
+import { Brand3DLogo } from '../components/Brand3DLogo'
 import { useAuth } from '../context/UserContext'
 import './Pages.css'
 
@@ -13,7 +14,7 @@ export function Login() {
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/app'
+  const from = (location.state as { from?: string } | null)?.from ?? '/app/accounts'
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />
@@ -38,6 +39,7 @@ export function Login() {
     <div className="page auth-page auth-page--framed">
       <h1 className="page-title">Giriş</h1>
       <p className="page-lead">E-posta ve şifre veya Meta OAuth ile devam edin.</p>
+      <Brand3DLogo className="auth-brand-logo" />
 
       <form className="panel auth-form" onSubmit={onSubmit}>
         {err && <p className="error-banner">{err}</p>}

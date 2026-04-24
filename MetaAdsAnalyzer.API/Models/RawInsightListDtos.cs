@@ -12,6 +12,8 @@ public sealed class RawInsightListRowDto
 
     public string? MetaCampaignId { get; set; }
 
+    public string? MetaAdsetId { get; set; }
+
     public DateOnly DateStart { get; set; }
 
     public DateOnly DateStop { get; set; }

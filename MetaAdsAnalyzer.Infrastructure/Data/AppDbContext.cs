@@ -33,6 +33,10 @@ public class AppDbContext : DbContext
 
     public DbSet<VideoAsset> VideoAssets => Set<VideoAsset>();
 
+    public DbSet<SavedReport> SavedReports => Set<SavedReport>();
+
+    public DbSet<SavedReportSuggestion> SavedReportSuggestions => Set<SavedReportSuggestion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

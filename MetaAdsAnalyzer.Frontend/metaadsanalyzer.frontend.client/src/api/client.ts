@@ -22,6 +22,9 @@ import type {
   MetaAdsetItem,
   VideoAssetRow,
   VideoReportAggregateResponse,
+  SavedReportItem,
+  SavedReportSuggestion,
+  SavedReportImpactFeedItem,
 } from './types'
 
 function assertPositiveUserId(userId: number, context: string): void {
@@ -137,6 +140,14 @@ export async function loginAccount(email: string, password: string): Promise<Aut
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json() as Promise<AuthResponse>
+}
+
+export async function getAuthMe(): Promise<{ userId: number; email: string | null }> {
+  const res = await authFetch('/api/auth/me', {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<{ userId: number; email: string | null }>
 }
 
 export async function getActiveDirectives(userId: number): Promise<DirectiveItem[]> {
@@ -312,8 +323,15 @@ export async function postSelectActiveMetaAdAccount(
   if (!res.ok) throw new Error(await parseError(res))
 }
 
-export async function getRawInsights(userId: number, level?: string): Promise<RawInsightRow[]> {
-  const q = level ? `?level=${encodeURIComponent(level)}` : ''
+export async function getRawInsights(
+  userId: number,
+  level?: string,
+  opts?: { campaignId?: string },
+): Promise<RawInsightRow[]> {
+  const params = new URLSearchParams()
+  if (level) params.set('level', level)
+  if (opts?.campaignId) params.set('campaignId', opts.campaignId)
+  const q = params.toString() ? `?${params.toString()}` : ''
   const res = await authFetch(`/api/raw-insights/by-user/${userId}${q}`, {
     headers: { Accept: 'application/json' },
   })
@@ -411,4 +429,55 @@ export async function downloadVideoReportPdf(body: {
   a.download = `video-rapor-${vid}.pdf`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export async function createSavedReport(body: {
+  userId: number
+  adId: string
+  adName?: string | null
+  thumbnailUrl?: string | null
+  campaignId?: string | null
+  campaignName?: string | null
+  adsetId?: string | null
+  adsetName?: string | null
+  aggregateRoas?: number | null
+  aggregateHookRate?: number | null
+  aggregateHoldRate?: number | null
+  aggregateSpend?: number | null
+  aggregatePurchases?: number | null
+  suggestions: Array<{
+    suggestionKey: string
+    directiveType?: string | null
+    severity: string
+    message: string
+    symptom?: string | null
+    reason?: string | null
+    action?: string | null
+  }>
+}): Promise<SavedReportItem> {
+  return postJson<SavedReportItem>('/api/saved-reports', body)
+}
+
+export async function listSavedReports(userId: number): Promise<SavedReportItem[]> {
+  const res = await authFetch(`/api/saved-reports/by-user/${userId}`, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<SavedReportItem[]>
+}
+
+export async function updateSavedSuggestionStatus(
+  suggestionId: number,
+  status: 'applied' | 'skipped',
+): Promise<SavedReportSuggestion> {
+  return postJson<SavedReportSuggestion>(`/api/saved-reports/suggestions/${suggestionId}/status`, { status })
+}
+
+export async function listSavedReportImpacts(
+  userId: number,
+  take = 10,
+): Promise<SavedReportImpactFeedItem[]> {
+  const res = await authFetch(`/api/saved-reports/impacts/by-user/${userId}?take=${take}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<SavedReportImpactFeedItem[]>
 }

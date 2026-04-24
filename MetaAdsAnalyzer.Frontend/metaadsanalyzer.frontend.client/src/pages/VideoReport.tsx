@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
-  downloadVideoReportPdf,
   getActiveDirectives,
   getLinkedMetaAdAccounts,
   getMetaAdsets,
@@ -9,7 +9,6 @@ import {
   getMetaCampaigns,
   getRawInsights,
   getUserProfile,
-  getVideoAssets,
   postDirectivesEvaluate,
   postInsightsSync,
   postMetricsRecompute,
@@ -23,10 +22,10 @@ import type {
   MetaAdsetItem,
   MetaCampaignItem,
   RawInsightRow,
-  VideoAssetRow,
   VideoReportAggregateResponse,
 } from '../api/types'
 import { useUser } from '../context/UserContext'
+import { addAnalyzedAd } from '../features/analyzedAdsStore'
 import './Pages.css'
 
 const PRESETS = [
@@ -36,14 +35,8 @@ const PRESETS = [
   { value: 'last_90d', label: 'Son 90 gün' },
 ]
 
-const EFF_ACTIVE = 'ACTIVE'
-
 function normEff(s: string | null | undefined): string {
   return (s ?? '').trim().toUpperCase()
-}
-
-function isActiveEffective(ad: MetaAdListItem): boolean {
-  return normEff(ad.effectiveStatus) === EFF_ACTIVE
 }
 
 type VideoGroup = {
@@ -90,56 +83,6 @@ function buildStatusLine(ads: MetaAdListItem[]): string {
     .join(' · ')
 }
 
-function buildVideoGroups(
-  ads: MetaAdListItem[],
-  spendByAdId: Map<string, number>,
-  assetRows: VideoAssetRow[],
-): VideoGroup[] {
-  const tagByVideo = new Map<string, string[]>()
-  for (const row of assetRows) {
-    tagByVideo.set(row.videoId, row.problemTags ?? [])
-  }
-
-  const buckets = new Map<string, MetaAdListItem[]>()
-  for (const ad of ads) {
-    const vk = ad.videoId?.trim() ? `v:${ad.videoId.trim()}` : `ad:${ad.id}`
-    if (!buckets.has(vk)) buckets.set(vk, [])
-    buckets.get(vk)!.push(ad)
-  }
-
-  const groups: VideoGroup[] = []
-  for (const [groupKey, list] of buckets) {
-    const videoId = list[0]?.videoId?.trim() ? list[0].videoId!.trim() : null
-    const withThumb = list.find((a) => a.thumbnailUrl)
-    const thumbnailUrl = withThumb?.thumbnailUrl ?? null
-    const displayName =
-      list.map((a) => a.creativeName?.trim() || a.videoTitle?.trim()).find(Boolean) ||
-      list[0]?.name?.trim() ||
-      (videoId ? `Video ${videoId}` : `Reklam ${list[0].id}`)
-
-    let totalSpend = 0
-    for (const a of list) {
-      totalSpend += spendByAdId.get(a.id) ?? 0
-    }
-
-    const cardTags = videoId ? (tagByVideo.get(videoId) ?? []) : []
-
-    groups.push({
-      groupKey,
-      videoId,
-      ads: list,
-      thumbnailUrl,
-      displayName,
-      statusLine: buildStatusLine(list),
-      totalSpend,
-      cardTags,
-    })
-  }
-
-  groups.sort((a, b) => b.totalSpend - a.totalSpend)
-  return groups
-}
-
 function severityRank(s: string): number {
   if (s === 'critical') return 0
   if (s === 'warning') return 1
@@ -165,6 +108,60 @@ function numFmt(v: number | null | undefined, digits = 2): string {
   return v.toFixed(digits)
 }
 
+type FunnelStep = { label: string; value: number; lossPct: number | null; lostCount: number }
+
+function buildFunnel(agg: VideoReportAggregateResponse, isVideo: boolean): FunnelStep[] {
+  const steps = isVideo
+    ? [
+        { label: 'Gösterim', value: agg.impressions },
+        { label: '3s İzleme', value: agg.videoPlay3s },
+        { label: '%50 İzleme', value: agg.videoP50 },
+        { label: 'ThruPlay', value: agg.thruPlay },
+        { label: 'Tıklama', value: agg.linkClicks },
+        { label: 'Sepet', value: agg.addToCart },
+        { label: 'Ödeme Başlat', value: agg.initiateCheckout },
+        { label: 'Satın Alma', value: agg.purchases },
+      ]
+    : [
+        { label: 'Gösterim', value: agg.impressions },
+        { label: 'Tıklama', value: agg.linkClicks },
+        { label: 'Sepet', value: agg.addToCart },
+        { label: 'Ödeme Başlat', value: agg.initiateCheckout },
+        { label: 'Satın Alma', value: agg.purchases },
+      ]
+  return steps.map((s, i) => {
+    if (i === 0) return { ...s, lossPct: null, lostCount: 0 }
+    const prev = steps[i - 1].value
+    if (prev <= 0) return { ...s, lossPct: null, lostCount: 0 }
+    const lost = Math.max(0, prev - s.value)
+    return { ...s, lostCount: lost, lossPct: (lost / prev) * 100 }
+  })
+}
+
+function statusIcon(ok: boolean, warn: boolean): string {
+  if (ok) return '✅'
+  if (warn) return '⚠️'
+  return '❌'
+}
+
+function directiveTypeLabel(value: string | null | undefined): string {
+  const t = (value ?? '').trim().toUpperCase()
+  if (t === 'OPTIMIZE') return 'Optimize Et'
+  if (t === 'SCALE') return 'Ölçekle'
+  if (t === 'STOP') return 'Durdur'
+  if (t === 'WATCH') return 'İzle'
+  return value ?? 'İzle'
+}
+
+function diagnosisText(aggregate: VideoReportAggregateResponse): string {
+  const first = (aggregate.narrativeLines ?? []).find((x) => x.trim().length > 0)
+  if (first) return first
+  if ((aggregate.problemTags ?? []).length > 0) {
+    return `Bu video setinde öne çıkan konu: ${aggregate.problemTags.join(', ')}.`
+  }
+  return 'Seçilen video seti için metrikler işlendi. Hook/hold/completion verisine göre aksiyon önerileri üretildi.'
+}
+
 /** API / eski yanıtlar için güvenli varsayılanlar (null alanlar UI’yi düşürmez). */
 function sanitizeVideoAggregate(raw: VideoReportAggregateResponse): VideoReportAggregateResponse {
   return {
@@ -174,14 +171,34 @@ function sanitizeVideoAggregate(raw: VideoReportAggregateResponse): VideoReportA
     linkClicks: Number.isFinite(raw.linkClicks) ? raw.linkClicks : 0,
     purchases: Number.isFinite(raw.purchases) ? raw.purchases : 0,
     purchaseValue: Number.isFinite(raw.purchaseValue) ? raw.purchaseValue : 0,
+    addToCart: Number.isFinite(raw.addToCart) ? raw.addToCart : 0,
+    initiateCheckout: Number.isFinite(raw.initiateCheckout) ? raw.initiateCheckout : 0,
+    videoPlay3s: Number.isFinite(raw.videoPlay3s) ? raw.videoPlay3s : 0,
+    videoP25: Number.isFinite(raw.videoP25) ? raw.videoP25 : 0,
+    videoP50: Number.isFinite(raw.videoP50) ? raw.videoP50 : 0,
+    videoP75: Number.isFinite(raw.videoP75) ? raw.videoP75 : 0,
+    videoP100: Number.isFinite(raw.videoP100) ? raw.videoP100 : 0,
+    thruPlay: Number.isFinite(raw.thruPlay) ? raw.thruPlay : 0,
     ctrLinkPct: Number.isFinite(raw.ctrLinkPct) ? raw.ctrLinkPct : 0,
     linkCvrPct: raw.linkCvrPct != null && Number.isFinite(raw.linkCvrPct) ? raw.linkCvrPct : null,
     thumbstopPct: raw.thumbstopPct != null && Number.isFinite(raw.thumbstopPct) ? raw.thumbstopPct : null,
     holdPct: raw.holdPct != null && Number.isFinite(raw.holdPct) ? raw.holdPct : null,
     completionPct: raw.completionPct != null && Number.isFinite(raw.completionPct) ? raw.completionPct : null,
     roas: raw.roas != null && Number.isFinite(raw.roas) ? raw.roas : null,
+    cpa: raw.cpa != null && Number.isFinite(raw.cpa) ? raw.cpa : null,
     breakEvenRoas: raw.breakEvenRoas != null && Number.isFinite(raw.breakEvenRoas) ? raw.breakEvenRoas : null,
     targetRoas: raw.targetRoas != null && Number.isFinite(raw.targetRoas) ? raw.targetRoas : null,
+    maxCpa: raw.maxCpa != null && Number.isFinite(raw.maxCpa) ? raw.maxCpa : null,
+    targetCpa: raw.targetCpa != null && Number.isFinite(raw.targetCpa) ? raw.targetCpa : null,
+    hasProductMap: raw.hasProductMap === true,
+    dataQuality: {
+      insufficientImpressions: raw.dataQuality?.insufficientImpressions === true,
+      lowPurchases: raw.dataQuality?.lowPurchases === true,
+      earlyData: raw.dataQuality?.earlyData === true,
+      learningPhase: raw.dataQuality?.learningPhase === true,
+      insufficientSpend: raw.dataQuality?.insufficientSpend === true,
+      warnings: Array.isArray(raw.dataQuality?.warnings) ? raw.dataQuality.warnings : [],
+    },
     creativeScore:
       raw.creativeScore != null && Number.isFinite(raw.creativeScore) ? Math.round(raw.creativeScore) : null,
     narrativeLines: Array.isArray(raw.narrativeLines) ? raw.narrativeLines : [],
@@ -193,7 +210,6 @@ function sanitizeVideoAggregate(raw: VideoReportAggregateResponse): VideoReportA
 
 export function VideoReport() {
   const { userId } = useUser()
-  const [tab, setTab] = useState<'active' | 'past'>('active')
   const [linked, setLinked] = useState<LinkedMetaAdAccountItem[]>([])
   const [activeAct, setActiveAct] = useState<string | null>(null)
   const [accountsLoading, setAccountsLoading] = useState(true)
@@ -208,13 +224,12 @@ export function VideoReport() {
   const [adsetsLoading, setAdsetsLoading] = useState(false)
   const [adsetsError, setAdsetsError] = useState<string | null>(null)
   const [selectedAdsetId, setSelectedAdsetId] = useState<string | null>(null)
+  const [adsetSpendById, setAdsetSpendById] = useState<Map<string, number>>(new Map())
 
   const [ads, setAds] = useState<MetaAdListItem[]>([])
   const [adsLoading, setAdsLoading] = useState(false)
   const [adsError, setAdsError] = useState<string | null>(null)
   const [rawsForSpend, setRawsForSpend] = useState<RawInsightRow[]>([])
-  const [videoAssetRows, setVideoAssetRows] = useState<VideoAssetRow[]>([])
-  const [filter, setFilter] = useState('')
   const [preset, setPreset] = useState('last_7d')
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null)
   const [stepLog, setStepLog] = useState<string | null>(null)
@@ -222,36 +237,15 @@ export function VideoReport() {
   const [selectedGroup, setSelectedGroup] = useState<VideoGroup | null>(null)
   const [aggregate, setAggregate] = useState<VideoReportAggregateResponse | null>(null)
   const [mergedDirectives, setMergedDirectives] = useState<DirectiveItem[]>([])
-  const [pdfAllowed, setPdfAllowed] = useState<boolean | null>(null)
+  const [resultModalOpen, setResultModalOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerStep, setPickerStep] = useState<'campaign' | 'adset' | 'ad'>('campaign')
+  const [pickerAdId, setPickerAdId] = useState<string | null>(null)
+  const [appliedRecIds, setAppliedRecIds] = useState<Set<string>>(new Set())
+  const [skippedRecIds, setSkippedRecIds] = useState<Set<string>>(new Set())
+  const [showDataQualityBanner, setShowDataQualityBanner] = useState(true)
 
   const spendByAdId = useMemo(() => buildSpendByAdId(rawsForSpend), [rawsForSpend])
-
-  const filteredAdsForTab = useMemo(() => {
-    if (tab === 'active') return ads.filter(isActiveEffective)
-    return ads.filter((a) => !isActiveEffective(a))
-  }, [ads, tab])
-
-  const videoGroups = useMemo(() => {
-    let list = buildVideoGroups(filteredAdsForTab, spendByAdId, videoAssetRows)
-    const q = filter.trim().toLowerCase()
-    if (q) {
-      list = list.filter((g) => {
-        const blob = [
-          g.displayName,
-          g.videoId,
-          ...g.ads.map((a) => [a.id, a.name, a.creativeName, a.videoTitle].filter(Boolean).join(' ')),
-        ]
-          .join(' ')
-          .toLowerCase()
-        return blob.includes(q)
-      })
-    }
-    list.sort((a, b) => {
-      if (b.totalSpend !== a.totalSpend) return b.totalSpend - a.totalSpend
-      return b.ads.length - a.ads.length
-    })
-    return list
-  }, [filteredAdsForTab, spendByAdId, filter, tab, videoAssetRows])
 
   const loadCampaignsForAct = useCallback(
     async (act: string) => {
@@ -263,7 +257,6 @@ export function VideoReport() {
       setAdsetsError(null)
       setAds([])
       setAdsError(null)
-      setVideoAssetRows([])
       try {
         const list = await getMetaCampaigns(userId, act)
         setCampaigns(list)
@@ -284,18 +277,65 @@ export function VideoReport() {
       setSelectedAdsetId(null)
       setAds([])
       setAdsError(null)
-      setVideoAssetRows([])
       try {
-        const list = await getMetaAdsets(userId, campaignId, act)
-        setAdsets(list)
+        // Adset harcaması campaign/adset listelerinde gelmez; insights sync ile güncel spend doldur.
+        await postInsightsSync(userId, 'adset', preset, { metaAdAccountId: act })
+        // Adset seviyesinde 0 gelen satırları, ad seviyesinden adset_id ile türeterek güvenli fallback yap.
+        await postInsightsSync(userId, 'ad', preset, { metaAdAccountId: act })
+        const [list, rawAdsets, rawAds] = await Promise.all([
+          getMetaAdsets(userId, campaignId, act),
+          getRawInsights(userId, 'adset', { campaignId }),
+          getRawInsights(userId, 'ad', { campaignId }),
+        ])
+
+        // Her adset için son satırı alıp harcama durumunu çıkar.
+        const latest = new Map<string, RawInsightRow>()
+        for (const row of [...rawAdsets].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))) {
+          if (!latest.has(row.entityId)) latest.set(row.entityId, row)
+        }
+
+        const spendMap = new Map<string, number>()
+        for (const [id, row] of latest.entries()) {
+          spendMap.set(id, row.spend ?? 0)
+        }
+
+        // ad-level fallback: her ad için en güncel satırı alıp adset bazında topla.
+        const latestAdRows = new Map<string, RawInsightRow>()
+        for (const row of [...rawAds].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))) {
+          if (!latestAdRows.has(row.entityId)) latestAdRows.set(row.entityId, row)
+        }
+        const adsetSpendFromAds = new Map<string, number>()
+        for (const row of latestAdRows.values()) {
+          const adsetId = row.metaAdsetId?.trim()
+          if (!adsetId) continue
+          adsetSpendFromAds.set(adsetId, (adsetSpendFromAds.get(adsetId) ?? 0) + (row.spend ?? 0))
+        }
+
+        for (const adset of list) {
+          const current = spendMap.get(adset.id)
+          const fallback = adsetSpendFromAds.get(adset.id)
+          if ((current == null || current <= 0) && fallback != null && fallback > 0) {
+            spendMap.set(adset.id, fallback)
+          }
+        }
+        setAdsetSpendById(spendMap)
+
+        // Yalnızca harcamasının kesin olarak 0 olduğu adsetleri gizle.
+        // Insight satırı hiç yoksa (undefined) adseti göster; kullanıcı reklamlara inebilsin.
+        const filtered = list.filter((x) => {
+          const spend = spendMap.get(x.id)
+          return spend == null || spend > 0
+        })
+        setAdsets(filtered)
       } catch (e: unknown) {
         setAdsetsError(e instanceof Error ? e.message : 'Reklam setleri yüklenemedi')
         setAdsets([])
+        setAdsetSpendById(new Map())
       } finally {
         setAdsetsLoading(false)
       }
     },
-    [userId],
+    [userId, preset],
   )
 
   const loadAdsForAdset = useCallback(
@@ -305,16 +345,9 @@ export function VideoReport() {
       try {
         const list = await getMetaAds(userId, act, { adsetId })
         setAds(list)
-        try {
-          const assets = await getVideoAssets(userId, act)
-          setVideoAssetRows(assets)
-        } catch {
-          setVideoAssetRows([])
-        }
       } catch (e: unknown) {
         setAdsError(e instanceof Error ? e.message : 'Reklamlar yüklenemedi')
         setAds([])
-        setVideoAssetRows([])
       } finally {
         setAdsLoading(false)
       }
@@ -343,7 +376,6 @@ export function VideoReport() {
         ])
         if (cancelled) return
         setLinked(linkedRows)
-        setPdfAllowed(profile.planAllowsPdfExport === true)
         const preferred =
           profile.metaAdAccountId &&
           linkedRows.some((l) => l.metaAdAccountId === profile.metaAdAccountId)
@@ -393,14 +425,18 @@ export function VideoReport() {
     }
   }
 
-  function selectGroup(g: VideoGroup) {
-    setSelectedGroup((prev) => (prev?.groupKey === g.groupKey ? prev : g))
+  function openPicker() {
+    if (!activeAct) return
+    setPickerOpen(true)
+    setPickerStep('campaign')
+    setPickerAdId(null)
   }
 
   useEffect(() => {
     setAggregate(null)
     setMergedDirectives([])
     setError(null)
+    setResultModalOpen(false)
   }, [selectedGroup?.groupKey])
 
   useEffect(() => {
@@ -409,15 +445,14 @@ export function VideoReport() {
     setMergedDirectives([])
     setError(null)
     setStepLog(null)
+    setResultModalOpen(false)
   }, [selectedCampaignId, selectedAdsetId])
 
-  async function runSelectedVideoAnalysis() {
-    const group = selectedGroup
-    if (!group || !activeAct || !selectedAdsetId) {
-      setError('Önce reklam seti ve video seçin; reklam hesabının doğru olduğundan emin olun.')
+  async function runAnalysisForAds(group: VideoGroup, adIds: string[]) {
+    if (!activeAct || !selectedAdsetId) {
+      setError('Önce reklam seti ve reklam seçin; reklam hesabının doğru olduğundan emin olun.')
       return
     }
-    const adIds = group.ads.map((a) => a.id.trim()).filter(Boolean)
     const videoId = group.videoId?.trim() || null
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
@@ -438,6 +473,7 @@ export function VideoReport() {
         adIds,
         metaAdAccountId: activeAct,
       })
+      setSelectedGroup(group)
       setStepLog(
         `Insights: ${sync.rowsFetched} satır çekildi, ${sync.rowsUpserted} kayıt güncellendi (${adIds.length} reklam, ad_id).`,
       )
@@ -458,6 +494,25 @@ export function VideoReport() {
 
       const aggRaw = await postVideoReportAggregate({ userId, adIds, metaAdAccountId: activeAct })
       setAggregate(sanitizeVideoAggregate(aggRaw))
+      setShowDataQualityBanner(true)
+      setResultModalOpen(true)
+      setAppliedRecIds(new Set())
+      setSkippedRecIds(new Set())
+      const firstAd = group.ads[0]
+      if (firstAd) {
+        await addAnalyzedAd({
+          userId,
+          adId: firstAd.id,
+          adName: firstAd.name?.trim() || firstAd.creativeName?.trim() || firstAd.id,
+          thumbnailUrl: firstAd.thumbnailUrl ?? null,
+          campaignId: selectedCampaignId,
+          campaignName: campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId,
+          adsetId: selectedAdsetId,
+          adsetName: adsets.find((x) => x.id === selectedAdsetId)?.name ?? selectedAdsetId,
+          aggregate: sanitizeVideoAggregate(aggRaw),
+          directives: dirs,
+        })
+      }
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.info('[VideoReport] Özet yanıtı:', {
@@ -467,18 +522,88 @@ export function VideoReport() {
       }
 
       await refreshSpendMap()
-      try {
-        const assets = await getVideoAssets(userId, activeAct)
-        setVideoAssetRows(assets)
-      } catch {
-        /* ignore */
-      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusyGroupKey(null)
     }
   }
+
+  async function runPickedAdAnalysis(adId?: string) {
+    const targetId = adId ?? pickerAdId
+    if (!targetId) return
+    const ad = ads.find((x) => x.id === targetId)
+    if (!ad) {
+      setError('Seçilen reklam bulunamadı. Listeyi yenileyin.')
+      return
+    }
+    const adSpend = spendByAdId.get(ad.id) ?? 0
+    if (adSpend <= 0) {
+      setStepLog('Bu reklamda harcama verisi 0/bilinmiyor; analiz yine de başlatıldı.')
+    }
+    const group: VideoGroup = {
+      groupKey: `ad:${ad.id}`,
+      videoId: ad.videoId?.trim() || null,
+      ads: [ad],
+      thumbnailUrl: ad.thumbnailUrl ?? null,
+      displayName: ad.creativeName?.trim() || ad.videoTitle?.trim() || ad.name?.trim() || `Reklam ${ad.id}`,
+      statusLine: buildStatusLine([ad]),
+      totalSpend: spendByAdId.get(ad.id) ?? 0,
+      cardTags: [],
+    }
+    setPickerOpen(false)
+    await runAnalysisForAds(group, [ad.id])
+  }
+
+  function onApplyRecommendation(recId: string, message: string) {
+    setAppliedRecIds((prev) => {
+      const next = new Set(prev)
+      next.add(recId)
+      return next
+    })
+    setSkippedRecIds((prev) => {
+      const next = new Set(prev)
+      next.delete(recId)
+      return next
+    })
+    setStepLog(`Öneri uygulandı olarak işaretlendi: ${message}`)
+  }
+
+  function onSkipRecommendation(recId: string, message: string) {
+    setSkippedRecIds((prev) => {
+      const next = new Set(prev)
+      next.add(recId)
+      return next
+    })
+    setAppliedRecIds((prev) => {
+      const next = new Set(prev)
+      next.delete(recId)
+      return next
+    })
+    setStepLog(`Öneri atlandı: ${message}`)
+  }
+
+  const isVideoAggregate = Boolean(selectedGroup?.videoId?.trim())
+  const funnelSteps = aggregate ? buildFunnel(aggregate, isVideoAggregate) : []
+  const timelineValues = aggregate
+    ? [
+        { pct: 25, value: aggregate.videoP25 },
+        { pct: 50, value: aggregate.videoP50 },
+        { pct: 75, value: aggregate.videoP75 },
+        { pct: 100, value: aggregate.videoP100 },
+      ]
+    : []
+  const biggestDrop = useMemo(() => {
+    if (!aggregate) return null
+    const pairs = [
+      { key: '%25→%50', prev: aggregate.videoP25, next: aggregate.videoP50 },
+      { key: '%50→%75', prev: aggregate.videoP50, next: aggregate.videoP75 },
+      { key: '%75→%100', prev: aggregate.videoP75, next: aggregate.videoP100 },
+    ].filter((x) => x.prev > 0)
+    if (pairs.length === 0) return null
+    const withDrop = pairs.map((p) => ({ ...p, dropPct: ((p.prev - p.next) / p.prev) * 100 }))
+    return withDrop.sort((a, b) => b.dropPct - a.dropPct)[0]
+  }, [aggregate])
 
   return (
     <div className="page">
@@ -527,6 +652,13 @@ export function VideoReport() {
             <div className="form-actions">
               <Button
                 type="button"
+                disabled={!activeAct || !!busyGroupKey || accountsLoading}
+                onClick={openPicker}
+              >
+                Kampanya Seç
+              </Button>
+              <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 disabled={
@@ -551,296 +683,344 @@ export function VideoReport() {
 
       {activeAct && !accountsLoading && (
         <section className="panel" style={{ marginTop: '1rem' }}>
-          <div className="form-stack" style={{ maxWidth: '28rem', marginBottom: '1rem' }}>
-            <label>
-              Kampanya
-              <select
-                value={selectedCampaignId ?? ''}
-                disabled={!!busyGroupKey || campaignsLoading || !activeAct}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (!activeAct) return
-                  if (!v) {
-                    setSelectedCampaignId(null)
-                    setAdsets([])
-                    setSelectedAdsetId(null)
-                    setAds([])
-                    setVideoAssetRows([])
-                    return
-                  }
-                  setSelectedCampaignId(v)
-                  void loadAdsetsForCampaign(activeAct, v)
-                }}
-              >
-                <option value="">Kampanya seçin…</option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {(c.name?.trim() || c.id) + (c.status ? ` · ${c.status}` : '')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {campaignsLoading && <p className="muted">Kampanyalar yükleniyor…</p>}
-            {campaignsError && <p className="error-banner">{campaignsError}</p>}
-            {!campaignsLoading && !campaignsError && campaigns.length === 0 && (
-              <p className="muted">Bu hesapta kampanya bulunamadı.</p>
-            )}
+          <p className="muted small">
+            {selectedCampaignId
+              ? `Seçilen kampanya: ${campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId}`
+              : 'Kampanya seçmek için yukarıdaki "Kampanya Seç" butonunu kullanın.'}
+            {selectedAdsetId ? ` · Adset: ${adsets.find((x) => x.id === selectedAdsetId)?.name ?? selectedAdsetId}` : ''}
+          </p>
 
-            <label>
-              Reklam seti
-              <select
-                value={selectedAdsetId ?? ''}
-                disabled={!!busyGroupKey || !selectedCampaignId || adsetsLoading}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (!activeAct) return
-                  if (!v) {
-                    setSelectedAdsetId(null)
-                    setAds([])
-                    setVideoAssetRows([])
-                    return
-                  }
-                  setSelectedAdsetId(v)
-                  void loadAdsForAdset(activeAct, v)
-                }}
-              >
-                <option value="">{selectedCampaignId ? 'Reklam seti seçin…' : 'Önce kampanya seçin'}</option>
-                {adsets.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {(s.name?.trim() || s.id) + (s.status ? ` · ${s.status}` : '')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {adsetsLoading && <p className="muted">Reklam setleri yükleniyor…</p>}
-            {adsetsError && <p className="error-banner">{adsetsError}</p>}
-            {!adsetsLoading &&
-              !adsetsError &&
-              selectedCampaignId &&
-              adsets.length === 0 && (
-                <p className="muted">Bu kampanyada reklam seti yok veya erişim yok.</p>
-              )}
-          </div>
-
-          {!selectedAdsetId && (
-            <p className="muted" style={{ marginBottom: '0.75rem' }}>
-              Video kartlarını görmek için bir reklam seti seçin.
-            </p>
-          )}
-
-          <div className="video-report-tablist" role="tablist" aria-label="Video listesi">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'active'}
-              disabled={!selectedAdsetId}
-              className={`video-report-tab${tab === 'active' ? ' video-report-tab-active' : ''}`}
-              onClick={() => setTab('active')}
-            >
-              Aktif videolar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'past'}
-              disabled={!selectedAdsetId}
-              className={`video-report-tab${tab === 'past' ? ' video-report-tab-active' : ''}`}
-              onClick={() => setTab('past')}
-            >
-              Geçmiş videolar
-            </button>
-          </div>
-
+          {!selectedAdsetId && <p className="muted">Kampanya Seç → Adset Seç akışıyla reklam seçip analiz başlatın.</p>}
           {selectedAdsetId && adsLoading && <p className="muted">Reklamlar yükleniyor…</p>}
           {selectedAdsetId && adsError && <p className="error-banner">{adsError}</p>}
-          {selectedAdsetId && !adsLoading && !adsError && videoGroups.length === 0 && (
-            <p className="muted">
-              {tab === 'active'
-                ? 'ACTIVE durumunda reklam yok veya bu hesapta video içerikli reklam bulunamadı.'
-                : 'Duraklatılmış / arşiv veya diğer durumda reklam yok.'}
-            </p>
-          )}
-          {selectedAdsetId && !adsLoading && videoGroups.length > 0 && (
-            <>
-              <label className="muted small" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                Ara
-                <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Kreatif, video ID…" />
-              </label>
-              <p className="muted small" style={{ marginTop: '0.5rem' }}>
-                Sıralama: hesaptaki son bilinen harcamaya göre (yüksek → düşük). Karttaki etiketler{' '}
-                <code>video_assets</code> özetinden gelir (reklam listesi yenilendiğinde güncellenir).
-              </p>
-              <div className="video-report-grid">
-                {videoGroups.map((g) => (
-                  <div
-                    key={g.groupKey}
-                    role="button"
-                    tabIndex={0}
-                    className={`video-ad-card${busyGroupKey === g.groupKey ? ' video-ad-card-busy' : ''}${selectedGroup?.groupKey === g.groupKey ? ' video-ad-card-selected' : ''}`}
-                    onClick={() => !busyGroupKey && selectGroup(g)}
-                    onKeyDown={(e) => {
-                      if (!busyGroupKey && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault()
-                        selectGroup(g)
-                      }
-                    }}
-                  >
-                    <div className="video-ad-thumb-wrap">
-                      {g.thumbnailUrl ? (
-                        <img src={g.thumbnailUrl} alt="" className="video-ad-thumb" loading="lazy" />
-                      ) : (
-                        <div className="video-ad-thumb-fallback" aria-hidden />
-                      )}
-                    </div>
-                    <div className="video-ad-card-body">
-                      <div className="video-ad-title">{g.displayName}</div>
-                      <div className="video-ad-meta muted small">
-                        {g.ads.length} reklamda kullanılıyor
-                        {g.totalSpend > 0 && <> · ~{g.totalSpend.toFixed(2)} harcama (önbellek)</>}
-                      </div>
-                      <div className="video-ad-sub muted small">{g.statusLine}</div>
-                      {g.videoId && (
-                        <div className="video-ad-id muted small" title={g.videoId}>
-                          video_id: {g.videoId}
-                        </div>
-                      )}
-                      {g.cardTags.length > 0 && (
-                        <div className="video-ad-tags" style={{ marginTop: '0.35rem' }}>
-                          {g.cardTags.map((t) => (
-                            <span key={t} className="health-pill" style={{ marginRight: '0.25rem', fontSize: '0.65rem' }}>
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          <h3 className="panel-title" style={{ marginTop: '0.75rem' }}>Analiz edilen reklamlar</h3>
+          <p className="muted small">
+            Bu bölüm ayrı sekmeye taşındı. Sol menüden <strong>Analiz edilen reklamlar</strong> sekmesini açın.
+          </p>
         </section>
       )}
 
-      {selectedGroup && (
-        <section className="panel" style={{ marginTop: '1.25rem' }}>
-          <h2 className="panel-title">Seçilen video</h2>
-          <p className="muted small">
-            <strong>{selectedGroup.displayName}</strong> · {selectedGroup.ads.length} reklam ·
-            {selectedGroup.videoId ? ` video_id ${selectedGroup.videoId}` : ' görsel / tek reklam grubu'}
-          </p>
-          <div className="form-actions" style={{ marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <Button
-              type="button"
-              disabled={!!busyGroupKey}
-              onClick={() => void runSelectedVideoAnalysis()}
-            >
-              Bu Videoyu Analiz Et
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={
-                !aggregate?.hasInsightRows ||
-                pdfAllowed !== true ||
-                !!busyGroupKey
-              }
-              onClick={() =>
-                void downloadVideoReportPdf({
-                  userId,
-                  adIds: selectedGroup.ads.map((a) => a.id),
-                  metaAdAccountId: activeAct ?? undefined,
-                  videoId: selectedGroup.videoId ?? undefined,
-                  displayName: selectedGroup.displayName,
-                })
-              }
-            >
-              PDF İndir
-            </Button>
-          </div>
-          {pdfAllowed === false && (
-            <p className="muted small" style={{ marginTop: '0.5rem' }}>
-              PDF dışa aktarma Pro planda.
-            </p>
-          )}
-        </section>
-      )}
+      {selectedGroup && false && <section />}
 
       {error && <p className="error-banner">{error}</p>}
       {stepLog && <p className="ok-banner">{stepLog}</p>}
 
-      {aggregate && selectedGroup && (
-        <section className="panel" style={{ marginTop: '1.25rem' }}>
-          <h2 className="panel-title">Birleşik analiz sonucu</h2>
-          {aggregate.hasInsightRows === false && aggregate.diagnosticMessage && (
-            <p className="error-banner" style={{ marginTop: '0.5rem' }}>
-              {aggregate.diagnosticMessage}
-            </p>
-          )}
-          <p className="muted small">
-            Harcama ağırlıklı oranlar (Graph ham satırı; video_p95 vb. boş olabilir): Thumbstop {pctFmt(aggregate.thumbstopPct)} ·
-            Hold {pctFmt(aggregate.holdPct)} · Completion {pctFmt(aggregate.completionPct)}
-          </p>
-          <div className="muted small" style={{ marginTop: '0.75rem' }}>
-            <strong>Birleşik metrikler</strong>: Harcama {numFmt(aggregate.spend)} · Gösterim {aggregate.impressions} ·
-            Erişim {aggregate.reach} · Tıklama {aggregate.linkClicks} · Satın alma {aggregate.purchases} · Satış cirosu{' '}
-            {numFmt(aggregate.purchaseValue)}
-            {aggregate.roas != null && Number.isFinite(aggregate.roas) && <> · ROAS {numFmt(aggregate.roas)}</>}
-            {aggregate.breakEvenRoas != null && Number.isFinite(aggregate.breakEvenRoas) && (
-              <> · Kâr eşiği ROAS {numFmt(aggregate.breakEvenRoas)}</>
+      {aggregate && selectedGroup && resultModalOpen && (
+        <div className="vr-modal-overlay" role="dialog" aria-modal="true" aria-label="AI video analiz sonucu">
+          <div className="vr-modal">
+            <button type="button" className="vr-modal-close" onClick={() => setResultModalOpen(false)} aria-label="Kapat">
+              ×
+            </button>
+            {showDataQualityBanner && aggregate.dataQuality.warnings.length > 0 && (
+              <div className="vr-quality-banner">
+                <strong>⚠ Veri kalitesi uyarıları</strong>
+                <ul>
+                  {aggregate.dataQuality.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+                <div className="form-actions">
+                  <button type="button" className="btn" onClick={() => setShowDataQualityBanner(false)}>
+                    Gizle
+                  </button>
+                  <button type="button" className="btn primary" onClick={() => setShowDataQualityBanner(false)}>
+                    Yine de göster
+                  </button>
+                </div>
+              </div>
             )}
-            {aggregate.targetRoas != null && Number.isFinite(aggregate.targetRoas) && (
-              <> · Hedef ROAS {numFmt(aggregate.targetRoas)}</>
-            )}
-          </div>
-          {aggregate.creativeScore != null && (
-            <p className="muted small" style={{ marginTop: '0.5rem' }}>
-              Kreatif skor: <strong>{aggregate.creativeScore}</strong>/100
-            </p>
-          )}
-          {(aggregate.problemTags ?? []).length > 0 && (
-            <div style={{ marginTop: '0.75rem' }}>
-              <strong className="muted small">Problem etiketleri</strong>
-              <div style={{ marginTop: '0.35rem' }}>
-                {(aggregate.problemTags ?? []).map((t) => (
-                  <span key={t} className="health-pill" style={{ marginRight: '0.35rem' }}>
-                    {t}
-                  </span>
-                ))}
+            <div className="vr-modal-main">
+              <div className="vr-modal-left">
+                {selectedGroup.thumbnailUrl ? (
+                  <img src={selectedGroup.thumbnailUrl} alt="" className="vr-modal-thumb" />
+                ) : (
+                  <div className="vr-modal-thumb-fallback" />
+                )}
+              </div>
+              <div className="vr-modal-right">
+                <div className="vr-diagnosis-box">
+                  <strong>AI TEŞHİSİ</strong>
+                  <p>{diagnosisText(aggregate)}</p>
+                </div>
+                <div className="vr-recs">
+                  <h3>ÖNERİLER</h3>
+                  {(mergedDirectives.length > 0 ? mergedDirectives : []).slice(0, 4).map((d) => {
+                    const recId = `dir-${d.id}`
+                    const isApplied = appliedRecIds.has(recId)
+                    const isSkipped = skippedRecIds.has(recId)
+                    return (
+                    <div key={d.id} className="vr-rec-row">
+                      <span className={`vr-priority ${d.severity === 'critical' ? 'vr-priority-high' : 'vr-priority-mid'}`}>
+                        {d.severity === 'critical' ? 'ÖNCELİKLİ' : 'ORTA'}
+                      </span>
+                      <span className="vr-priority vr-priority-mid">{directiveTypeLabel(d.directiveType)}</span>
+                      <p>{d.symptom ?? d.message}</p>
+                      <p className="vr-reason">{d.reason ?? 'Neden bilgisi yok.'}</p>
+                      <p className="vr-action">{d.action ?? 'İncele ve uygun aksiyonu uygula.'}</p>
+                      {(isApplied || isSkipped) && (
+                        <span className={`vr-priority ${isApplied ? 'vr-priority-applied' : 'vr-priority-skipped'}`}>
+                          {isApplied ? 'UYGULANDI' : 'ATLANDI'}
+                        </span>
+                      )}
+                      <div className="vr-rec-actions">
+                        <button type="button" className="btn" onClick={() => onSkipRecommendation(recId, d.message)}>Atla</button>
+                        <button type="button" className="btn primary" onClick={() => onApplyRecommendation(recId, d.message)}>Uygula</button>
+                      </div>
+                    </div>
+                  )})}
+                  {mergedDirectives.length === 0 && (
+                    <div className="vr-rec-row">
+                      {(() => {
+                        const recId = 'fallback-rec'
+                        const isApplied = appliedRecIds.has(recId)
+                        const isSkipped = skippedRecIds.has(recId)
+                        return (
+                          <>
+                      <span className="vr-priority vr-priority-mid">ORTA</span>
+                      <span className="vr-priority vr-priority-mid">Optimize Et</span>
+                      <p>Hook ve hold performansı hedefin altında.</p>
+                      <p className="vr-reason">Mevcut kreatif kombinasyonu izleyiciyi yeterince taşımıyor.</p>
+                      <p className="vr-action">Hazırla: 2-3 yeni kreatif varyantını test akışına al.</p>
+                      {(isApplied || isSkipped) && (
+                        <span className={`vr-priority ${isApplied ? 'vr-priority-applied' : 'vr-priority-skipped'}`}>
+                          {isApplied ? 'UYGULANDI' : 'ATLANDI'}
+                        </span>
+                      )}
+                      <div className="vr-rec-actions">
+                        <button type="button" className="btn" onClick={() => onSkipRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')}>Atla</button>
+                        <button type="button" className="btn primary" onClick={() => onApplyRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')}>Uygula</button>
+                      </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-          {(aggregate.narrativeLines ?? []).length > 0 && (
-            <ul className="muted small" style={{ marginTop: '0.75rem' }}>
-              {(aggregate.narrativeLines ?? []).map((line, i) => (
-                <li key={i} style={{ marginBottom: '0.35rem' }}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          )}
-          {mergedDirectives.length > 0 && (
-            <>
-              <h3 className="panel-title" style={{ marginTop: '1rem', fontSize: '1rem' }}>
-                Direktifler
-              </h3>
-              <ul className="creative-grid" style={{ marginTop: '0.5rem' }}>
-                {mergedDirectives.map((d) => (
-                  <li key={d.id} className="creative-card">
-                    <div className="creative-top">
-                      {d.score != null && <span className="score-badge">{d.score}</span>}
-                      {d.healthStatus && <span className="health-pill">{d.healthStatus}</span>}
-                      <span className="muted small" style={{ fontSize: '0.7rem' }}>
-                        reklam {d.entityId}
-                      </span>
+            <div className="vr-funnel">
+              <h3>Dönüşüm Hunisi</h3>
+              <div className="vr-funnel-list">
+                {funnelSteps.map((step, i) => {
+                  const width = Math.max(28, 100 - i * (isVideoAggregate ? 8 : 12))
+                  const highDrop = (step.lossPct ?? 0) > 70
+                  return (
+                    <div key={`${step.label}-${i}`} className="vr-funnel-item-wrap">
+                      <div
+                        className={`vr-funnel-item ${highDrop ? 'vr-funnel-item-risk' : ''}`}
+                        style={{ width: `${width}%` }}
+                        title={
+                          step.lossPct == null
+                            ? `${step.label}`
+                            : `Bu adımda ${step.lostCount.toLocaleString('tr-TR')} kişi kaybedildi`
+                        }
+                      >
+                        <span>{step.label}</span>
+                        <strong>{step.value.toLocaleString('tr-TR')}</strong>
+                        <em>{step.lossPct == null ? '—' : `Düşüş ${step.lossPct.toFixed(1)}%`}</em>
+                      </div>
+                      {i < funnelSteps.length - 1 && <span className="vr-funnel-arrow">↓</span>}
                     </div>
-                    <p className="creative-msg">{d.message}</p>
-                  </li>
+                  )
+                })}
+              </div>
+            </div>
+
+            {isVideoAggregate && (
+              <div className="vr-timeline">
+                <h3>Video Zaman Çizgisi</h3>
+                <div className="vr-timeline-bar" />
+                <div className="vr-timeline-points">
+                  {timelineValues.map((p) => (
+                    <div key={p.pct} className="vr-timeline-point" style={{ left: `${p.pct}%` }}>
+                      <span>{p.pct}%</span>
+                      <strong>{p.value.toLocaleString('tr-TR')}</strong>
+                    </div>
+                  ))}
+                </div>
+                {biggestDrop && (
+                  <p className="vr-drop-marker">
+                    Izleyicilerin %{biggestDrop.dropPct.toFixed(1)}'i {biggestDrop.key} adımında ayrıldı.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="vr-metric-content">
+              <h3>Metrik Özeti</h3>
+              <table className="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Metrik Adı</th>
+                    <th>Değer</th>
+                    <th>Sektör Ortalaması</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>İlk 3 Saniye İzleme (Hook Rate)</td><td>{pctFmt(aggregate.thumbstopPct)}</td><td>Ort: %25 · İyi: &gt;%30</td><td>{statusIcon((aggregate.thumbstopPct ?? 0) > 20, (aggregate.thumbstopPct ?? 0) >= 10 && (aggregate.thumbstopPct ?? 0) <= 20)}</td></tr>
+                  <tr><td>İçerik Tutma Gücü (Hold Rate)</td><td>{pctFmt(aggregate.holdPct)}</td><td>Ort: %20 · İyi: &gt;%25</td><td>{statusIcon((aggregate.holdPct ?? 0) > 15, (aggregate.holdPct ?? 0) >= 8 && (aggregate.holdPct ?? 0) <= 15)}</td></tr>
+                  <tr><td>Link Tıklama Oranı (CTR)</td><td>{pctFmt(aggregate.ctrLinkPct)}</td><td>Ort: %1.2 · İyi: &gt;%2</td><td>{statusIcon((aggregate.ctrLinkPct ?? 0) > 1, (aggregate.ctrLinkPct ?? 0) >= 0.5 && (aggregate.ctrLinkPct ?? 0) <= 1)}</td></tr>
+                  <tr><td>Satın Alma Dönüşümü (CVR)</td><td>{pctFmt(aggregate.linkCvrPct)}</td><td>Ort: %1.5 · İyi: &gt;%3</td><td>{statusIcon((aggregate.linkCvrPct ?? 0) > 1, (aggregate.linkCvrPct ?? 0) >= 0.5 && (aggregate.linkCvrPct ?? 0) <= 1)}</td></tr>
+                  <tr><td>Reklam maliyeti</td><td>₺{numFmt(aggregate.cpa)}</td><td>—</td><td>{statusIcon((aggregate.targetCpa ?? 0) > 0 && (aggregate.cpa ?? Number.MAX_VALUE) < (aggregate.targetCpa ?? 0), (aggregate.maxCpa ?? 0) > 0 && (aggregate.cpa ?? Number.MAX_VALUE) < (aggregate.maxCpa ?? 0))}</td></tr>
+                  <tr><td>Yatırım Getirisi (ROAS)</td><td>{numFmt(aggregate.roas)}x</td><td>Ort: 2.5x · İyi: &gt;4x</td><td>{statusIcon((aggregate.targetRoas ?? 0) > 0 && (aggregate.roas ?? 0) > (aggregate.targetRoas ?? 0), (aggregate.breakEvenRoas ?? 0) > 0 && (aggregate.roas ?? 0) > (aggregate.breakEvenRoas ?? 0))}</td></tr>
+                  <tr>
+                    <td>Basabas ROAS</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `${numFmt(aggregate.breakEvenRoas)}x`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                  <tr>
+                    <td>Hedef ROAS</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `${numFmt(aggregate.targetRoas)}x`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                  <tr>
+                    <td>Maksimum CPA</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `₺${numFmt(aggregate.maxCpa)}`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                  <tr>
+                    <td>Hedef CPA</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `₺${numFmt(aggregate.targetCpa)}`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                </tbody>
+              </table>
+              {!aggregate.hasProductMap && (
+                <p className="muted small" style={{ marginTop: '0.55rem' }}>
+                  Maliyet bilgisi eksik — Ürünler sayfasından maliyet girin ve Kampanyalar sayfasından eşleyin.{' '}
+                  <Link to="/app/products">Ürünler sayfasına git</Link>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pickerOpen && (
+        <div className="vr-modal-overlay" role="dialog" aria-modal="true" aria-label="Kampanya seçim ekranı">
+          <div className="vr-modal">
+            <button type="button" className="vr-modal-close" onClick={() => setPickerOpen(false)} aria-label="Kapat">×</button>
+            <h2 className="panel-title">Kampanya seç</h2>
+            {pickerStep === 'campaign' && (
+              <div className="campaign-list">
+                {campaignsLoading && <p className="muted">Kampanyalar yükleniyor…</p>}
+                {campaignsError && <p className="error-banner">{campaignsError}</p>}
+                {campaigns.map((c) => (
+                  <button
+                    type="button"
+                    key={c.id}
+                    className="campaign-row campaign-picker-btn"
+                    onClick={() => {
+                      if (!activeAct) return
+                      setSelectedCampaignId(c.id)
+                      setSelectedAdsetId(null)
+                      setPickerAdId(null)
+                      setPickerStep('adset')
+                      void loadAdsetsForCampaign(activeAct, c.id)
+                    }}
+                  >
+                    <div className="campaign-main">
+                      <div className="campaign-title">{c.name?.trim() || c.id}</div>
+                      <div className="campaign-meta muted small">{c.objective ?? '—'} · {c.status ?? '—'}</div>
+                    </div>
+                  </button>
                 ))}
-              </ul>
-            </>
-          )}
-        </section>
+              </div>
+            )}
+            {pickerStep === 'adset' && (
+              <div className="campaign-list">
+                <div className="form-actions" style={{ marginBottom: '0.35rem' }}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPickerStep('campaign')}>← Kampanyalar</Button>
+                </div>
+                {adsetsLoading && <p className="muted">Reklam setleri yükleniyor…</p>}
+                {adsetsError && <p className="error-banner">{adsetsError}</p>}
+                {adsets.map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    className="campaign-row campaign-picker-btn"
+                    onClick={() => {
+                      if (!activeAct) return
+                      setSelectedAdsetId(s.id)
+                      setPickerAdId(null)
+                      setPickerStep('ad')
+                      void loadAdsForAdset(activeAct, s.id)
+                    }}
+                  >
+                    <div className="campaign-main">
+                      <div className="campaign-title">{s.name?.trim() || s.id}</div>
+                      <div className="campaign-meta muted small">
+                        {s.status ?? '—'} · campaign {s.campaignId ?? '—'} · harcama{' '}
+                        {adsetSpendById.has(s.id) ? (adsetSpendById.get(s.id) ?? 0).toFixed(2) : 'bilinmiyor'}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {pickerStep === 'ad' && (
+              <div className="campaign-list">
+                <div className="form-actions" style={{ marginBottom: '0.35rem' }}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPickerStep('adset')}>← Adsetler</Button>
+                </div>
+                {adsLoading && <p className="muted">Reklamlar yükleniyor…</p>}
+                {adsError && <p className="error-banner">{adsError}</p>}
+                {ads.map((a) => {
+                  const adSpend = spendByAdId.get(a.id) ?? 0
+                  return (
+                  <div
+                    key={a.id}
+                    className={`campaign-row ${pickerAdId === a.id ? 'account-card-active' : ''}`}
+                    onClick={() => setPickerAdId(a.id)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+                      <div style={{ width: '70px', height: '70px', borderRadius: '8px', overflow: 'hidden', background: 'hsl(var(--muted))' }}>
+                        {a.thumbnailUrl ? (
+                          <img src={a.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%' }} />
+                        )}
+                      </div>
+                      <div className="campaign-main">
+                        <div className="campaign-title">{a.name?.trim() || a.creativeName?.trim() || a.id}</div>
+                        <div className="campaign-meta muted small">
+                          reklam {a.id} · video_id {a.videoId?.trim() || '—'} · harcama {adSpend.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="form-actions" style={{ justifyContent: 'flex-end' }}>
+                      <button type="button" className="btn">Atla</button>
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={!!busyGroupKey}
+                        title={adSpend <= 0 ? 'Harcama verisi 0/bilinmiyor; analiz yapılabilir.' : undefined}
+                        onClick={() => void runPickedAdAnalysis(a.id)}
+                      >
+                        Uygula
+                      </button>
+                    </div>
+                  </div>
+                )})}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )

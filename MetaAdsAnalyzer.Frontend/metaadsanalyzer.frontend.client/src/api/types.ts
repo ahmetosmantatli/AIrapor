@@ -29,6 +29,9 @@ export type DirectiveItem = {
   directiveType: string
   severity: string
   message: string
+  symptom?: string | null
+  reason?: string | null
+  action?: string | null
   score: number | null
   healthStatus: string | null
   triggeredAt: string
@@ -134,6 +137,7 @@ export type RawInsightRow = {
   entityId: string
   entityName: string | null
   metaCampaignId: string | null
+  metaAdsetId: string | null
   dateStart: string
   dateStop: string
   fetchedAt: string
@@ -162,14 +166,34 @@ export type VideoReportAggregateResponse = {
   linkClicks: number
   purchases: number
   purchaseValue: number
+  addToCart: number
+  initiateCheckout: number
+  videoPlay3s: number
+  videoP25: number
+  videoP50: number
+  videoP75: number
+  videoP100: number
+  thruPlay: number
   ctrLinkPct: number
   linkCvrPct: number | null
   thumbstopPct: number | null
   holdPct: number | null
   completionPct: number | null
   roas: number | null
+  cpa: number | null
   breakEvenRoas: number | null
   targetRoas: number | null
+  maxCpa: number | null
+  targetCpa: number | null
+  hasProductMap: boolean
+  dataQuality: {
+    insufficientImpressions: boolean
+    lowPurchases: boolean
+    earlyData: boolean
+    learningPhase: boolean
+    insufficientSpend: boolean
+    warnings: string[]
+  }
   creativeScore: number | null
   narrativeLines: string[]
   problemTags: string[]
@@ -221,4 +245,61 @@ export type CreateProductPayload = {
   returnRatePct: number
   ltvMultiplier: number
   targetMarginPct: number
+}
+
+export type SavedReportSuggestion = {
+  id: number
+  suggestionKey: string
+  directiveType: string | null
+  severity: string
+  message: string
+  symptom: string | null
+  reason: string | null
+  action: string | null
+  appliedAt: string | null
+  skippedAt: string | null
+  beforeRoas: number | null
+  beforeHookRate: number | null
+  beforeHoldRate: number | null
+  beforeSpend: number | null
+  beforePurchases: number | null
+  afterRoas: number | null
+  afterHookRate: number | null
+  afterHoldRate: number | null
+  afterSpend: number | null
+  afterPurchases: number | null
+  impactMeasuredAt: string | null
+  metaChangeDetected: boolean
+  metaChangeMessage: string | null
+}
+
+export type SavedReportItem = {
+  id: number
+  adId: string
+  adName: string | null
+  thumbnailUrl: string | null
+  campaignId: string | null
+  campaignName: string | null
+  adsetId: string | null
+  adsetName: string | null
+  analyzedAt: string
+  aggregateRoas: number | null
+  aggregateHookRate: number | null
+  aggregateHoldRate: number | null
+  aggregateSpend: number | null
+  aggregatePurchases: number | null
+  suggestions: SavedReportSuggestion[]
+}
+
+export type SavedReportImpactFeedItem = {
+  suggestionId: number
+  savedReportId: number
+  adId: string
+  adName: string | null
+  appliedAt: string
+  impactMeasuredAt: string | null
+  beforeRoas: number | null
+  afterRoas: number | null
+  metaChangeDetected: boolean
+  metaChangeMessage: string | null
 }

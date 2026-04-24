@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { registerAccount } from '../api/client'
+import { Brand3DLogo } from '../components/Brand3DLogo'
 import { useAuth } from '../context/UserContext'
 import './Pages.css'
 
@@ -13,7 +14,7 @@ export function Register() {
   const [busy, setBusy] = useState(false)
 
   if (isAuthenticated) {
-    return <Navigate to="/app" replace />
+    return <Navigate to="/app/accounts" replace />
   }
 
   async function onSubmit(e: FormEvent) {
@@ -23,7 +24,7 @@ export function Register() {
     try {
       const r = await registerAccount(email.trim(), password)
       setSession(r.accessToken, r.userId, r.email)
-      navigate('/app', { replace: true })
+      navigate('/app/accounts', { replace: true })
     } catch (ex: unknown) {
       setErr(ex instanceof Error ? ex.message : 'Kayıt başarısız')
     } finally {
@@ -35,6 +36,7 @@ export function Register() {
     <div className="page auth-page auth-page--framed">
       <h1 className="page-title">Kayıt</h1>
       <p className="page-lead">Yeni hesap; ardından ürün ve kampanya eşlemesi ekleyin.</p>
+      <Brand3DLogo className="auth-brand-logo" />
 
       <form className="panel auth-form" onSubmit={onSubmit}>
         {err && <p className="error-banner">{err}</p>}

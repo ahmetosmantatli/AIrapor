@@ -26,6 +26,7 @@ public class RawInsightsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<RawInsightListRowDto>>> ListByUser(
         int userId,
         [FromQuery] string? level,
+        [FromQuery] string? campaignId,
         CancellationToken cancellationToken)
     {
         if (userId <= 0)
@@ -55,6 +56,12 @@ public class RawInsightsController : ControllerBase
         if (levelNorm is not null)
         {
             q = q.Where(r => r.Level == levelNorm);
+        }
+
+        if (!string.IsNullOrWhiteSpace(campaignId))
+        {
+            var campaignIdNorm = campaignId.Trim();
+            q = q.Where(r => r.MetaCampaignId == campaignIdNorm);
         }
 
         var raws = await q
@@ -89,6 +96,7 @@ public class RawInsightsController : ControllerBase
                     EntityId = r.EntityId,
                     EntityName = r.EntityName,
                     MetaCampaignId = r.MetaCampaignId,
+                    MetaAdsetId = r.MetaAdsetId,
                     DateStart = r.DateStart,
                     DateStop = r.DateStop,
                     FetchedAt = r.FetchedAt,

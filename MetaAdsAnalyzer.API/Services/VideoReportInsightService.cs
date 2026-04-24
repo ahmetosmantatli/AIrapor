@@ -9,11 +9,16 @@ namespace MetaAdsAnalyzer.API.Services;
 public sealed class VideoReportInsightService : IVideoReportInsightService
 {
     private readonly AppDbContext _db;
+    private readonly IDataQualityService _dataQualityService;
     private readonly ILogger<VideoReportInsightService> _logger;
 
-    public VideoReportInsightService(AppDbContext db, ILogger<VideoReportInsightService> logger)
+    public VideoReportInsightService(
+        AppDbContext db,
+        IDataQualityService dataQualityService,
+        ILogger<VideoReportInsightService> logger)
     {
         _db = db;
+        _dataQualityService = dataQualityService;
         _logger = logger;
     }
 
@@ -115,6 +120,14 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
         long linkClicks = 0;
         long purchases = 0;
         decimal purchaseValue = 0;
+        long addToCart = 0;
+        long initiateCheckout = 0;
+        long videoPlay3s = 0;
+        long videoP25 = 0;
+        long videoP50 = 0;
+        long videoP75 = 0;
+        long videoP100 = 0;
+        long thruPlay = 0;
         decimal wCtr = 0;
         decimal wThumb = 0;
         decimal wHold = 0;
@@ -128,6 +141,10 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
         decimal denTg = 0;
         decimal wScore = 0;
         decimal denScore = 0;
+        decimal wMaxCpa = 0;
+        decimal denMaxCpa = 0;
+        decimal wTargetCpa = 0;
+        decimal denTargetCpa = 0;
 
         foreach (var raw in latestByAd.Values)
         {
@@ -137,6 +154,14 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
             linkClicks += raw.LinkClicks;
             purchases += raw.Purchases;
             purchaseValue += raw.PurchaseValue;
+            addToCart += raw.AddToCart;
+            initiateCheckout += raw.InitiateCheckout;
+            videoPlay3s += raw.VideoPlay3s;
+            videoP25 += raw.VideoP25;
+            videoP50 += raw.VideoP50;
+            videoP75 += raw.VideoP75;
+            videoP100 += raw.VideoP100;
+            thruPlay += raw.VideoThruplay;
 
             if (raw.Spend > 0)
             {
@@ -188,10 +213,23 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
                     wScore += sc * raw.Spend;
                     denScore += raw.Spend;
                 }
+
+                if (c.MaxCpa is > 0m && raw.Spend > 0)
+                {
+                    wMaxCpa += c.MaxCpa.Value * raw.Spend;
+                    denMaxCpa += raw.Spend;
+                }
+
+                if (c.TargetCpa is > 0m && raw.Spend > 0)
+                {
+                    wTargetCpa += c.TargetCpa.Value * raw.Spend;
+                    denTargetCpa += raw.Spend;
+                }
             }
         }
 
         var roas = spend > 0 ? purchaseValue / spend : (decimal?)null;
+        var cpa = purchases > 0 ? spend / purchases : (decimal?)null;
         var ctrLink = spend > 0 ? wCtr / spend : 0m;
         var linkCvr = linkClicks > 0 ? (decimal)purchases / linkClicks * 100m : (decimal?)null;
         var thumbstop = denThumb > 0 ? wThumb / denThumb : (decimal?)null;
@@ -199,7 +237,20 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
         var completion = denComp > 0 ? wComp / denComp : (decimal?)null;
         var breakEven = denBe > 0 ? wBe / denBe : (decimal?)null;
         var target = denTg > 0 ? wTg / denTg : (decimal?)null;
+        var maxCpa = denMaxCpa > 0 ? wMaxCpa / denMaxCpa : (decimal?)null;
+        var targetCpa = denTargetCpa > 0 ? wTargetCpa / denTargetCpa : (decimal?)null;
         int? creativeScore = denScore > 0 ? (int)Math.Round(wScore / denScore, MidpointRounding.AwayFromZero) : null;
+        var campaignIds = latestByAd.Values
+            .Select(r => r.MetaCampaignId?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var hasProductMap = campaignIds.Count > 0
+                            && await _db.CampaignProductMaps.AsNoTracking()
+                                .AnyAsync(m => m.UserId == userId && campaignIds.Contains(m.CampaignId), cancellationToken)
+                                .ConfigureAwait(false);
+        var dq = _dataQualityService.Evaluate(latestByAd.Values.ToList(), learningPhase: false, dailyBudget: null);
 
         var narrative = VideoNarrativeBuilder.BuildNarrativeLines(
             thumbstop,
@@ -234,14 +285,35 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
             LinkClicks = linkClicks,
             Purchases = purchases,
             PurchaseValue = purchaseValue,
+            AddToCart = addToCart,
+            InitiateCheckout = initiateCheckout,
+            VideoPlay3s = videoPlay3s,
+            VideoP25 = videoP25,
+            VideoP50 = videoP50,
+            VideoP75 = videoP75,
+            VideoP100 = videoP100,
+            ThruPlay = thruPlay,
             CtrLinkPct = ctrLink,
             LinkCvrPct = linkCvr,
             ThumbstopPct = thumbstop,
             HoldPct = hold,
             CompletionPct = completion,
             Roas = roas,
+            Cpa = cpa,
             BreakEvenRoas = breakEven,
             TargetRoas = target,
+            MaxCpa = maxCpa,
+            TargetCpa = targetCpa,
+            HasProductMap = hasProductMap,
+            DataQuality = new VideoReportDataQualityDto
+            {
+                InsufficientImpressions = dq.InsufficientImpressions,
+                LowPurchases = dq.LowPurchases,
+                EarlyData = dq.EarlyData,
+                LearningPhase = dq.LearningPhase,
+                InsufficientSpend = dq.InsufficientSpend,
+                Warnings = dq.Warnings,
+            },
             CreativeScore = creativeScore,
             NarrativeLines = narrative,
             ProblemTags = tags,

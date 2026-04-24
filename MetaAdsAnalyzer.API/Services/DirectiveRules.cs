@@ -24,7 +24,9 @@ internal static class DirectiveRules
                     "campaign",
                     "WATCH",
                     "info",
-                    "Düşük örneklem: gösterim < 1000; ROAS ve CPA yorumlarını dikkatle kullanın.",
+                    "Gösterim sayısı güvenilir yorum için düşük seviyede.",
+                    "Örneklem 1000 gösterimin altında olduğu için metrik oynaklığı yüksektir.",
+                    "İzle: Veriyi büyüt ve karar öncesi daha fazla gösterim topla.",
                     score,
                     health));
         }
@@ -39,7 +41,9 @@ internal static class DirectiveRules
                     "campaign",
                     "WATCH",
                     "warning",
-                    "Satın alma sayısı 5’ten az; ROAS hedefi için henüz kesin karar vermeyin.",
+                    "Satın alma sayısı düşük olduğu için performans yorumu zayıf kalıyor.",
+                    "Dönüşüm sayısı 5'in altında olduğunda ROAS istatistiksel olarak volatil olur.",
+                    "Bekle: Karar vermeden önce daha fazla satın alma verisi topla.",
                     score,
                     health));
         }
@@ -55,7 +59,9 @@ internal static class DirectiveRules
                     "campaign",
                     "WATCH",
                     "info",
-                    "Veri olgunlaşana kadar bekleyin (düşük harcama, az gün ve az dönüşüm).",
+                    "Veri henüz olgunlaşmadığı için erken yorum riski var.",
+                    "Harcama düşük, gün sayısı az ve dönüşüm sinyali yeterince birikmedi.",
+                    "Bekle: En az birkaç gün daha veri biriktir ve sonra yeniden değerlendir.",
                     score,
                     health));
         }
@@ -73,7 +79,9 @@ internal static class DirectiveRules
                     "campaign",
                     "SCALE",
                     "info",
-                    "ROAS hedefin üzerinde, yeterli harcama ve süre: ölçeklemeyi değerlendir (kademeli bütçe).",
+                    "Kampanya hedefin üzerinde performans gösteriyor.",
+                    "ROAS hedefi geçti ve harcama/süre ölçekleme için yeterli seviyeye ulaştı.",
+                    "Artır: Bütçeyi kademeli şekilde yükselt.",
                     score,
                     health));
         }
@@ -92,7 +100,9 @@ internal static class DirectiveRules
                     "campaign",
                     "OPTIMIZE",
                     "warning",
-                    "Kâr eşiğinin üzerindesin ancak hedef ROAS altında: kreatif ve teklif optimizasyonu.",
+                    "Kampanya zarar etmiyor ama hedef kârlılığa ulaşamıyor.",
+                    "ROAS break-even üstünde kalsa da target seviyesinin altında.",
+                    "Optimize Et: Kreatif, hedefleme ve teklif ayarlarını iyileştir.",
                     score,
                     health));
         }
@@ -110,7 +120,9 @@ internal static class DirectiveRules
                     "campaign",
                     "STOP",
                     "critical",
-                    "ROAS kâr eşiğinin altında ve yeterli dönüşüm/süre var: kampanyayı durdurmayı değerlendir.",
+                    "Kampanya sürdürülebilir kârlılık eşiğinin altında kaldı.",
+                    "ROAS break-even altına düştü ve karar için yeterli dönüşüm/süre oluştu.",
+                    "Durdur: Bütçeyi kes veya kampanyayı kapat.",
                     score,
                     health));
         }
@@ -132,7 +144,9 @@ internal static class DirectiveRules
                     "adset",
                     "SCALE",
                     "info",
-                    "CPA hedefin altında ve yeterli harcama: kazanan sete bütçe aktarmayı değerlendir.",
+                    "Adset maliyet verimliliği güçlü görünüyor.",
+                    "Gerçek CPA hedef CPA'nın altında ve harcama anlamlı seviyede.",
+                    "Artır: Kazanan adsete daha fazla bütçe aktar.",
                     score,
                     health));
         }
@@ -146,7 +160,9 @@ internal static class DirectiveRules
                     "adset",
                     "STOP",
                     "critical",
-                    "CPA üst güvenlik marjını aştı (10+ dönüşüm): seti kapatmayı değerlendir.",
+                    "Adset satın alma maliyeti kabul edilen sınırı aştı.",
+                    "CPA, max CPA üstüne çıktı ve karar için yeterli dönüşüm birikti.",
+                    "Durdur: Adseti kapat veya bütçeyi sert azalt.",
                     score,
                     health));
         }
@@ -160,7 +176,9 @@ internal static class DirectiveRules
                     "adset",
                     "OPTIMIZE",
                     "warning",
-                    "Frekans yüksek (3.5+): kreatif yorgunluğu; yeni kreatif veya hedef kısma.",
+                    "Aynı kitle reklamı fazla görmeye başladı.",
+                    "Frekans 3.5 üstünde olduğunda kreatif yorgunluğu ve performans düşüşü artar.",
+                    "Değiştir: Yeni kreatif yükle veya hedef kitleyi yenile.",
                     score,
                     health));
         }
@@ -174,7 +192,9 @@ internal static class DirectiveRules
                     "adset",
                     "OPTIMIZE",
                     "warning",
-                    "Link CTR düşük ve gösterim yeterli: teklif veya hedefleme sorunu olabilir.",
+                    "İlgi çekme performansı düşük kaldı.",
+                    "Gösterim yüksek olmasına rağmen link tıklama oranı zayıf.",
+                    "Değiştir: Hedefleme veya kreatif açısını güncelle.",
                     score,
                     health));
         }
@@ -190,7 +210,9 @@ internal static class DirectiveRules
                     "adset",
                     "OPTIMIZE",
                     "warning",
-                    "CTR iyi ama dönüşüm düşük: açılış sayfası veya teklif uyumu kontrolü.",
+                    "Reklam tıklama alıyor ama satışa dönüşmüyor.",
+                    "CTR güçlü olsa da dönüşüm oranı düşük; sorun büyük olasılıkla sayfa/teklif tarafında.",
+                    "İncele: Landing page ve teklif uyumunu düzelt.",
                     score,
                     health));
         }
@@ -204,6 +226,11 @@ internal static class DirectiveRules
         var healthLocal = health;
         var list = new List<Directive>();
         var cvr = LinkCvrPct(raw);
+        var atcRate = raw.LinkClicks <= 0 ? (decimal?)null : (decimal)raw.AddToCart / raw.LinkClicks * 100m;
+        var purchaseFromAtc = raw.AddToCart <= 0 ? (decimal?)null : (decimal)raw.Purchases / raw.AddToCart;
+        var purchaseFromCheckout = raw.InitiateCheckout <= 0 ? (decimal?)null : (decimal)raw.Purchases / raw.InitiateCheckout;
+        var p50DropRatio = raw.VideoP25 > 0 ? (decimal)raw.VideoP50 / raw.VideoP25 : (decimal?)null;
+        var p100DropRatio = raw.VideoP75 > 0 ? (decimal)raw.VideoP100 / raw.VideoP75 : (decimal?)null;
 
         list.Add(
             Dir(
@@ -212,7 +239,9 @@ internal static class DirectiveRules
                 "ad",
                 "WATCH",
                 "info",
-                $"Özet skor: {scoreValue}/100 — {health}",
+                $"Reklam için genel skor {scoreValue}/100 seviyesinde.",
+                "Skor tüm temel sinyallerin birleşik performansını yansıtır.",
+                "İncele: Tanılara göre öncelikli aksiyonu uygula.",
                 score,
                 healthLocal));
 
@@ -227,7 +256,9 @@ internal static class DirectiveRules
                     "ad",
                     "OPTIMIZE",
                     "warning",
-                    "Hook rate düşük: ilk 3 sn / açılış karesini güçlendir.",
+                    $"İzleyicilerin yalnızca %{hookVal?.ToString("F1")} kadarı ilk 3 saniyeyi geçiyor.",
+                    "Açılış karesi veya ilk cümle dikkat çekmiyor.",
+                    "Değiştir: Açılışı daha güçlü bir vaad/soru ile başlat.",
                     score,
                     healthLocal));
         }
@@ -241,7 +272,43 @@ internal static class DirectiveRules
                     "ad",
                     "OPTIMIZE",
                     "warning",
-                    "Hold rate düşük: video ortası senaryo ve ritim iyileştirmesi.",
+                    $"Video ortasında izleyici tutma zayıf (%{m.HoldRate?.ToString("F1")}).",
+                    "İçerik ritmi orta bölümde düşüyor ve ilgi kaybı oluşuyor.",
+                    "Değiştir: Orta bölümü sıkıştır ve tempoyu yükselt.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK VIDEO KURALI #1: p25 -> p50 sert düşüş.
+        if (raw.VideoP25 > 0 && p50DropRatio is < 0.5m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "İzleyici %25 noktasından sonra hızlı şekilde ayrılıyor.",
+                    "Orta kısımda içerik gücü düşüyor veya vaat zayıflıyor.",
+                    "Ekle: Videonun ortasına güçlü bir sahne ve yeni hook yerleştir.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK VIDEO KURALI #2: p75 -> p100 sert düşüş.
+        if (raw.VideoP75 > 0 && p100DropRatio is < 0.5m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Video bitişine yakın izleyici kaybı keskinleşiyor.",
+                    "Son bölümde CTA geç kalıyor veya final zayıf kalıyor.",
+                    "Değiştir: CTA'yı %75 civarında öne çek ve finali kısalt.",
                     score,
                     healthLocal));
         }
@@ -255,7 +322,9 @@ internal static class DirectiveRules
                     "ad",
                     "OPTIMIZE",
                     "warning",
-                    "Hook iyi ama CTR düşük: CTA veya statik görsel mesajı netleştir.",
+                    "Video izleniyor ama tıklama davranışı düşük kalıyor.",
+                    "Mesaj-CTA bağı net olmadığı için kullanıcı aksiyona geçmiyor.",
+                    "Değiştir: CTA metnini ve görsel mesajı netleştir.",
                     score,
                     healthLocal));
         }
@@ -271,7 +340,94 @@ internal static class DirectiveRules
                     "ad",
                     "OPTIMIZE",
                     "warning",
-                    "CTR yüksek, dönüşüm düşük: landing page ve teklif uyumu.",
+                    "Tıklama güçlü olmasına rağmen satın alma dönüşümü zayıf.",
+                    "Reklam vaadi ile ürün sayfası/teklif deneyimi uyumsuz olabilir.",
+                    "İncele: Landing page akışını ve teklif netliğini iyileştir.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK VIDEO KURALI #3: CTR > 2 ve Purchase CVR < 1.
+        if (raw.CtrLink > 2m && cvr is < 1m && raw.LinkClicks > 0)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Reklam etkileşim üretiyor ancak satışa dönüşüm düşük.",
+                    "Sorun kreatiften çok ürün sayfası ve checkout akışında görünüyor.",
+                    "İncele: Ürün sayfası dönüşüm adımlarını optimize et.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK STATİK KURALI #4: CTR düşük + CPM yüksek.
+        if (!m.IsVideoCreative && raw.CtrLink < 0.8m && raw.Cpm > 50m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Statik kreatif yanlış kitlede zayıf tepki alıyor.",
+                    "Düşük CTR ve yüksek CPM birlikte audience-mesaj uyumsuzluğunu gösterir.",
+                    "Daralt: Audience segmentini daralt veya yeni kitleye geç.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK STATİK KURALI #5: CTR iyi + ATC düşük.
+        if (!m.IsVideoCreative && raw.CtrLink > 1m && atcRate is < 3m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Kullanıcı tıklıyor ancak sepete ekleme oranı düşük kalıyor.",
+                    "Fiyat algısı, ürün anlatımı veya görsel güven sinyali yetersiz olabilir.",
+                    "İncele: Fiyat, ürün açıklaması ve görsel kaliteyi güçlendir.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK STATİK KURALI #6: ATC iyi ama satın alma ATC'ye göre düşük.
+        if (!m.IsVideoCreative && atcRate is > 3m && purchaseFromAtc is < 0.3m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Sepete ekleme var fakat satın alma adımına geçiş zayıf.",
+                    "Kargo, ödeme seçenekleri veya güven unsurları sürtünme yaratıyor olabilir.",
+                    "İncele: Kargo/ödeme ve güven sinyallerini iyileştir.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK STATİK KURALI #7: Checkout'tan satın almaya son adım kaybı.
+        if (!m.IsVideoCreative && raw.InitiateCheckout > 0 && purchaseFromCheckout is < 0.5m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "STOP",
+                    "critical",
+                    "Kullanıcılar ödeme son adımında süreci terk ediyor.",
+                    "Fiyat şoku veya ödeme sayfası sürtünmesi dönüşümü düşürüyor.",
+                    "İncele: Ödeme sayfasını sadeleştir ve fiyat sürprizlerini kaldır.",
                     score,
                     healthLocal));
         }
@@ -288,7 +444,9 @@ internal static class DirectiveRules
                     "ad",
                     "STOP",
                     "warning",
-                    "Frekans yüksek ve ROAS hedef altı: reklamı durdur / yenile.",
+                    "Aynı kitlede reklam yorulması nedeniyle verim düşüyor.",
+                    "Frekans yükselirken ROAS hedefin altında kaldı.",
+                    "Durdur: Reklamı kapat ve yeni varyasyonla yeniden test et.",
                     score,
                     healthLocal));
         }
@@ -302,7 +460,26 @@ internal static class DirectiveRules
                     "ad",
                     "OPTIMIZE",
                     "warning",
-                    "Mismatch oranı yüksek: genel tıklama ile link tıklaması uyumsuz; CTA’yı netleştir.",
+                    "Etkileşim var ancak link tıklaması kalitesi düşük.",
+                    "Mismatch oranı yüksek olduğunda kreatif mesajı aksiyona dönüşmez.",
+                    "Değiştir: CTA metnini ve kreatif-ürün bağını netleştir.",
+                    score,
+                    healthLocal));
+        }
+
+        // EKSİK STATİK KURALI #8: Statikte mismatch > 2.5.
+        if (!m.IsVideoCreative && m.MismatchRatio is > 2.5m)
+        {
+            list.Add(
+                Dir(
+                    userId,
+                    raw.EntityId,
+                    "ad",
+                    "OPTIMIZE",
+                    "warning",
+                    "Statik kreatifte tıklama kalitesi düşük kalıyor.",
+                    "Görsel anlatım ile ürün vaadi arasında zayıf bağ bulunuyor.",
+                    "Değiştir: Görseli ürün faydasına daha net bağla.",
                     score,
                     healthLocal));
         }
@@ -316,12 +493,14 @@ internal static class DirectiveRules
                     "ad",
                     "STOP",
                     "critical",
-                    "Genel sağlık: Durdur — skor veya kârlılık eşikleri kritik.",
+                    "Genel reklam sağlığı kritik seviyeye düştü.",
+                    "Skor ve kârlılık göstergeleri kabul edilebilir eşiğin altında.",
+                    "Durdur: Reklamı kapat ve yeni kreatif stratejisiyle yeniden başlat.",
                     score,
                     healthLocal));
         }
 
-        return Dedupe(list);
+        return PrioritizeTop3(Dedupe(list));
     }
 
     private static Directive Dir(
@@ -330,9 +509,14 @@ internal static class DirectiveRules
         string entityType,
         string directiveType,
         string severity,
-        string message,
+        string symptom,
+        string reason,
+        string action,
         int? score,
-        string? healthStatus) =>
+        string? healthStatus)
+    {
+        var message = $"Semptom: {symptom}\nNeden: {reason}\nAksiyon: {action}";
+        return
         new()
         {
             UserId = userId,
@@ -341,11 +525,15 @@ internal static class DirectiveRules
             DirectiveType = directiveType,
             Severity = severity,
             Message = message,
+            Symptom = symptom,
+            Reason = reason,
+            Action = action,
             Score = score,
             HealthStatus = healthStatus,
             TriggeredAt = DateTimeOffset.UtcNow,
             IsActive = true,
         };
+    }
 
     private static List<Directive> Dedupe(List<Directive> list)
     {
@@ -361,5 +549,18 @@ internal static class DirectiveRules
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<Directive> PrioritizeTop3(List<Directive> list)
+    {
+        static int SevRank(string sev) =>
+            string.Equals(sev, "critical", StringComparison.OrdinalIgnoreCase) ? 0 :
+            string.Equals(sev, "warning", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
+
+        return list
+            .OrderBy(d => SevRank(d.Severity))
+            .ThenByDescending(d => d.TriggeredAt)
+            .Take(3)
+            .ToList();
     }
 }

@@ -4,12 +4,15 @@ import { PublicAuthLayout } from './components/PublicAuthLayout'
 import { RequireAuth } from './components/RequireAuth'
 import { UserProvider } from './context/UserContext'
 import { Analysis } from './pages/Analysis'
+import { Accounts } from './pages/Accounts'
+import { AnalyzedAds } from './pages/AnalyzedAds'
 import { CampaignMaps } from './pages/CampaignMaps'
 import { ConnectMeta } from './pages/ConnectMeta'
 import { Creatives } from './pages/Creatives'
 import { Dashboard } from './pages/Dashboard'
 import { LandingPage } from './pages/LandingPage'
 import { Login } from './pages/Login'
+import { ImpactTracking } from './pages/ImpactTracking'
 import { ProductsSetup } from './pages/ProductsSetup'
 import { Register } from './pages/Register'
 import { Settings } from './pages/Settings'
@@ -31,9 +34,13 @@ export default function App() {
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<Layout />}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<Navigate to="/app/accounts" replace />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="dashboard" element={<Dashboard />} />
               <Route path="analysis" element={<Analysis />} />
               <Route path="video-report" element={<VideoReport />} />
+              <Route path="analyzed-ads" element={<AnalyzedAds />} />
+              <Route path="impact-tracking" element={<ImpactTracking />} />
               <Route path="creatives" element={<Creatives />} />
               <Route path="products" element={<ProductsSetup />} />
               <Route path="campaigns" element={<CampaignMaps />} />

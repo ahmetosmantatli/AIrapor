@@ -32,6 +32,15 @@ public class Directive
     [MaxLength(2000)]
     public string Message { get; set; } = null!;
 
+    [MaxLength(1000)]
+    public string? Symptom { get; set; }
+
+    [MaxLength(1000)]
+    public string? Reason { get; set; }
+
+    [MaxLength(1000)]
+    public string? Action { get; set; }
+
     /// <summary>0–100; çoğunlukla reklam (ad) seviyesi.</summary>
     public int? Score { get; set; }
 

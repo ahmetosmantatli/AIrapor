@@ -150,7 +150,12 @@ public sealed class MetricsComputationService : IMetricsComputationService
                 MismatchRatio = mismatchFallback,
                 ComputedAt = DateTimeOffset.UtcNow,
             };
-            cm0.CreativeScoreTotal = AdCreativeScore.Compute(raw, cm0).Score;
+            cm0.IsVideoCreative = await ResolveIsVideoCreativeAsync(raw, cancellationToken).ConfigureAwait(false);
+            var score0 = AdCreativeScore.Compute(raw, cm0);
+            cm0.CreativeScoreTotal = score0.Score;
+            cm0.CreativeScoreLabel = score0.Label;
+            cm0.CreativeScoreColor = score0.Color;
+            cm0.VideoMetricsUnavailable = score0.VideoMetricsUnavailable;
             _db.ComputedMetrics.Add(cm0);
 
             return true;
@@ -200,7 +205,12 @@ public sealed class MetricsComputationService : IMetricsComputationService
             MismatchRatio = mismatch,
             ComputedAt = DateTimeOffset.UtcNow,
         };
-        cm1.CreativeScoreTotal = AdCreativeScore.Compute(raw, cm1).Score;
+        cm1.IsVideoCreative = await ResolveIsVideoCreativeAsync(raw, cancellationToken).ConfigureAwait(false);
+        var score1 = AdCreativeScore.Compute(raw, cm1);
+        cm1.CreativeScoreTotal = score1.Score;
+        cm1.CreativeScoreLabel = score1.Label;
+        cm1.CreativeScoreColor = score1.Color;
+        cm1.VideoMetricsUnavailable = score1.VideoMetricsUnavailable;
         _db.ComputedMetrics.Add(cm1);
 
         return true;
@@ -216,5 +226,29 @@ public sealed class MetricsComputationService : IMetricsComputationService
         return string.Equals(raw.Level, "campaign", StringComparison.OrdinalIgnoreCase)
             ? raw.EntityId
             : null;
+    }
+
+    private async Task<bool> ResolveIsVideoCreativeAsync(RawInsight raw, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(raw.Level, "ad", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var act = raw.MetaAdAccountId;
+        if (string.IsNullOrWhiteSpace(act))
+        {
+            return false;
+        }
+
+        return await _db.AdVideoLinks.AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == raw.UserId
+                     && x.AdId == raw.EntityId
+                     && x.MetaAdAccountId == act
+                     && x.VideoId != null
+                     && x.VideoId != "",
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 }

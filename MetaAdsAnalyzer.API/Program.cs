@@ -71,8 +71,10 @@ builder.Services.AddScoped<IMetricsComputationService, MetricsComputationService
 builder.Services.AddScoped<IDirectiveEngineService, DirectiveEngineService>();
 builder.Services.AddScoped<IVideoAssetSyncService, VideoAssetSyncService>();
 builder.Services.AddScoped<IVideoReportInsightService, VideoReportInsightService>();
+builder.Services.AddScoped<IDataQualityService, DataQualityService>();
 
 builder.Services.AddHostedService<MetaInsightsSchedulingService>();
+builder.Services.AddHostedService<SuggestionImpactMeasurementService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

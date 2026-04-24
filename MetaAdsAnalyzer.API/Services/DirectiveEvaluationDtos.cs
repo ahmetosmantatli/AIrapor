@@ -29,6 +29,12 @@ public sealed class DirectiveListItemDto
 
     public string Message { get; set; } = null!;
 
+    public string? Symptom { get; set; }
+
+    public string? Reason { get; set; }
+
+    public string? Action { get; set; }
+
     public int? Score { get; set; }
 
     public string? HealthStatus { get; set; }

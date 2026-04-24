@@ -29,6 +29,10 @@ public class RawInsight
     [MaxLength(128)]
     public string? MetaCampaignId { get; set; }
 
+    /// <summary>Meta adset kimliği (özellikle ad satırlarından adset maliyeti türetmek için).</summary>
+    [MaxLength(128)]
+    public string? MetaAdsetId { get; set; }
+
     /// <summary>Insights kaynağı reklam hesabı (Graph act_…).</summary>
     [MaxLength(64)]
     public string? MetaAdAccountId { get; set; }
@@ -71,6 +75,8 @@ public class RawInsight
     public long InitiateCheckout { get; set; }
 
     public long ViewContent { get; set; }
+
+    public long LandingPageViews { get; set; }
 
     public long VideoPlay3s { get; set; }
 

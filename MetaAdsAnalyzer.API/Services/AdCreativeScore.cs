@@ -4,140 +4,149 @@ namespace MetaAdsAnalyzer.API.Services;
 
 public static class AdCreativeScore
 {
-    public static (int Score, string Health) Compute(RawInsight raw, ComputedMetric m)
+    public static (int Score, string Health, string Label, string Color, bool VideoMetricsUnavailable) Compute(
+        RawInsight raw,
+        ComputedMetric m)
     {
-        var hook = ScoreFromThumbstop(m.ThumbstopRatePct ?? m.HookRate);
-        var hold = ScoreFromHold(m.HoldRate);
-        var completion = ScoreFromCompletion(m.CompletionRatePct);
-        var roasPart = ScoreFromConversion(m.Roas, m.TargetRoas, m.BreakEvenRoas, raw);
+        if (m.IsVideoCreative)
+        {
+            return ComputeVideo(raw, m);
+        }
+
+        return ComputeStatic(raw, m);
+    }
+
+    private static (int Score, string Health, string Label, string Color, bool VideoMetricsUnavailable) ComputeVideo(
+        RawInsight raw,
+        ComputedMetric m)
+    {
+        var missingVideoMetrics = raw.VideoPlay3s <= 0;
+
+        var hook = missingVideoMetrics ? 50m : ScoreHook(m.ThumbstopRatePct ?? m.HookRate);
+        var hold = missingVideoMetrics ? 50m : ScoreHold(m.HoldRate);
+        var clickQuality = ScoreClickQuality(raw, m);
+        var conversion = ScoreConversion(raw, m);
 
         var total = (int)Math.Round(
-            hook * 0.3m + hold * 0.25m + completion * 0.15m + roasPart * 0.3m,
+            hook * 0.25m + hold * 0.20m + clickQuality * 0.30m + conversion * 0.25m,
             MidpointRounding.AwayFromZero);
         total = Math.Clamp(total, 0, 100);
 
-        var health = ClassifyHealth(total, m, raw);
-        return (total, health);
+        var (label, color) = LabelForScore(total);
+        var health = HealthFromLabel(label);
+        return (total, health, label, color, missingVideoMetrics);
     }
 
-    private static decimal ScoreFromThumbstop(decimal? thumbOrHookPct)
+    private static (int Score, string Health, string Label, string Color, bool VideoMetricsUnavailable) ComputeStatic(
+        RawInsight raw,
+        ComputedMetric m)
     {
-        if (thumbOrHookPct is null)
-        {
-            return 50m;
-        }
+        var attention = ScoreClickQuality(raw, m);
+        var audience = ScoreAudience(raw);
+        var conversion = ScoreConversion(raw, m);
 
-        var h = thumbOrHookPct.Value;
-        if (h >= DirectiveThresholds.HookGoodPct)
-        {
-            return 100m;
-        }
+        var total = (int)Math.Round(
+            attention * 0.35m + audience * 0.25m + conversion * 0.40m,
+            MidpointRounding.AwayFromZero);
+        total = Math.Clamp(total, 0, 100);
 
-        if (h >= DirectiveThresholds.HookPoorPct)
-        {
-            return 60m;
-        }
-
-        return 25m;
+        var (label, color) = LabelForScore(total);
+        var health = HealthFromLabel(label);
+        return (total, health, label, color, false);
     }
 
-    private static decimal ScoreFromHold(decimal? holdPct)
+    private static decimal ScoreHook(decimal? pct)
     {
-        if (holdPct is null)
-        {
-            return 50m;
-        }
-
-        var h = holdPct.Value;
-        if (h >= 40m)
-        {
-            return 100m;
-        }
-
-        if (h >= DirectiveThresholds.HoldPoorPct)
-        {
-            return 65m;
-        }
-
-        return 25m;
+        if (pct is null) return 50m;
+        if (pct > 40m) return 100m;
+        if (pct >= 30m) return 80m;
+        if (pct >= 20m) return 60m;
+        if (pct >= 10m) return 35m;
+        return 10m;
     }
 
-    private static decimal ScoreFromCompletion(decimal? completionPct)
+    private static decimal ScoreHold(decimal? pct)
     {
-        if (completionPct is null)
-        {
-            return 50m;
-        }
-
-        var c = completionPct.Value;
-        if (c >= 15m)
-        {
-            return 100m;
-        }
-
-        if (c >= 5m)
-        {
-            return 65m;
-        }
-
-        return 25m;
+        if (pct is null) return 50m;
+        if (pct > 35m) return 100m;
+        if (pct >= 25m) return 80m;
+        if (pct >= 15m) return 55m;
+        if (pct >= 8m) return 30m;
+        return 10m;
     }
 
-    private static decimal ScoreFromConversion(
-        decimal? roas,
-        decimal? targetRoas,
-        decimal? breakEvenRoas,
-        RawInsight raw)
+    private static decimal ScoreClickQuality(RawInsight raw, ComputedMetric m)
     {
-        if (raw.Purchases < DirectiveThresholds.MinPurchasesForRoasDecision)
+        var ctr = raw.CtrLink;
+        decimal baseScore;
+        if (ctr > 3m) baseScore = 100m;
+        else if (ctr >= 2m) baseScore = 80m;
+        else if (ctr >= 1m) baseScore = 55m;
+        else if (ctr >= 0.5m) baseScore = 30m;
+        else baseScore = 10m;
+
+        if (m.MismatchRatio is > 3m)
         {
-            return 45m;
+            baseScore -= 15m;
         }
 
-        if (roas is null || targetRoas is null || targetRoas <= 0)
-        {
-            return 40m;
-        }
-
-        var ratioToTarget = roas.Value / targetRoas.Value;
-        if (ratioToTarget >= 1m)
-        {
-            return 100m;
-        }
-
-        if (breakEvenRoas is > 0 && roas < breakEvenRoas.Value)
-        {
-            return 20m;
-        }
-
-        if (breakEvenRoas is > 0 && targetRoas.Value > breakEvenRoas.Value)
-        {
-            var span = targetRoas.Value - breakEvenRoas.Value;
-            var t = Math.Clamp((roas.Value - breakEvenRoas.Value) / span, 0m, 1m);
-            return 40m + 45m * t;
-        }
-
-        return Math.Clamp(55m * ratioToTarget, 10m, 90m);
+        return Math.Clamp(baseScore, 0m, 100m);
     }
 
-    private static string ClassifyHealth(int score, ComputedMetric m, RawInsight raw)
+    private static decimal ScoreConversion(RawInsight raw, ComputedMetric m)
     {
-        if (score < 30 || (m.Roas is not null && m.BreakEvenRoas is not null && m.Roas < m.BreakEvenRoas
-                                                      && raw.Purchases >= DirectiveThresholds.MinPurchasesForStop))
+        if (m.TargetCpa is > 0m && m.Cpa is > 0m)
         {
-            return "Durdur";
+            var cpaScore = (m.TargetCpa.Value / m.Cpa.Value) * 100m;
+            return Math.Clamp(cpaScore, 0m, 100m);
         }
 
-        if (m.NetMarginPct is < 0 || (m.Roas is not null && m.BreakEvenRoas is not null && m.Roas < m.BreakEvenRoas))
+        if (raw.LinkClicks <= 0)
         {
-            return "Zarar";
+            return 10m;
         }
 
-        if (m.Roas is not null && m.TargetRoas is not null && m.Roas >= m.TargetRoas)
-        {
-            return "Karlı";
-        }
-
-        return "Test";
+        var cvr = (decimal)raw.Purchases / raw.LinkClicks * 100m;
+        if (cvr > 4m) return 100m;
+        if (cvr >= 2m) return 80m;
+        if (cvr >= 1m) return 55m;
+        if (cvr >= 0.5m) return 30m;
+        return 10m;
     }
+
+    private static decimal ScoreAudience(RawInsight raw)
+    {
+        var highCpm = raw.Cpm > 50m;
+        var highCtr = raw.CtrLink >= 2m;
+        decimal score = (highCpm, highCtr) switch
+        {
+            (false, true) => 100m,
+            (false, false) => 50m,
+            (true, true) => 70m,
+            (true, false) => 20m,
+        };
+        if (raw.Frequency > 3.5m)
+        {
+            score -= 20m;
+        }
+
+        return Math.Clamp(score, 0m, 100m);
+    }
+
+    private static (string Label, string Color) LabelForScore(int score)
+    {
+        if (score >= 80) return ("Winner", "green");
+        if (score >= 60) return ("Potansiyel", "blue");
+        if (score >= 40) return ("Zayıf", "orange");
+        return ("Kapat", "red");
+    }
+
+    private static string HealthFromLabel(string label) =>
+        label switch
+        {
+            "Winner" => "Karlı",
+            "Potansiyel" => "Test",
+            "Zayıf" => "Zarar",
+            _ => "Durdur",
+        };
 }

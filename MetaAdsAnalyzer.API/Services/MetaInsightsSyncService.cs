@@ -54,6 +54,11 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         "view_content", "omni_view_content", "offsite_conversion.fb_pixel_view_content",
     };
 
+    private static readonly HashSet<string> LandingPageViewTypes = new(StringComparer.Ordinal)
+    {
+        "landing_page_view",
+    };
+
     private static readonly HashSet<string> Video3sTypes = new(StringComparer.Ordinal)
     {
         "video_view", "video_view_3s", "3_second_video_view",
@@ -888,6 +893,12 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             metaCampaignId = entityId;
         }
 
+        var metaAdsetId = GetString(row, "adset_id");
+        if (string.IsNullOrEmpty(metaAdsetId) && string.Equals(level, "adset", StringComparison.OrdinalIgnoreCase))
+        {
+            metaAdsetId = entityId;
+        }
+
         return new RawInsight
         {
             UserId = userId,
@@ -897,6 +908,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             EntityId = entityId,
             EntityName = string.IsNullOrWhiteSpace(entityName) ? null : entityName,
             MetaCampaignId = string.IsNullOrWhiteSpace(metaCampaignId) ? null : metaCampaignId,
+            MetaAdsetId = string.IsNullOrWhiteSpace(metaAdsetId) ? null : metaAdsetId,
             DateStart = dateStart,
             DateStop = dateStop,
             Spend = ParseDecimal(row, "spend"),
@@ -913,6 +925,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             AddToCart = SumMatchingActionLong(actions, AddToCartTypes),
             InitiateCheckout = SumMatchingActionLong(actions, InitiateCheckoutTypes),
             ViewContent = SumMatchingActionLong(actions, ViewContentTypes),
+            LandingPageViews = SumMatchingActionLong(actions, LandingPageViewTypes),
             VideoPlay3s = video3s,
             VideoThruplay = videoThru,
             Video15Sec = SumMatchingActionLong(actions, Video15sActionTypes),
@@ -931,6 +944,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         target.FetchedAt = source.FetchedAt;
         target.EntityName = source.EntityName;
         target.MetaCampaignId = source.MetaCampaignId;
+        target.MetaAdsetId = source.MetaAdsetId;
         target.MetaAdAccountId = source.MetaAdAccountId;
         target.Spend = source.Spend;
         target.Impressions = source.Impressions;
@@ -946,6 +960,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         target.AddToCart = source.AddToCart;
         target.InitiateCheckout = source.InitiateCheckout;
         target.ViewContent = source.ViewContent;
+        target.LandingPageViews = source.LandingPageViews;
         target.VideoPlay3s = source.VideoPlay3s;
         target.VideoThruplay = source.VideoThruplay;
         target.Video15Sec = source.Video15Sec;

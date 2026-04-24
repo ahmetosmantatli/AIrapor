@@ -139,6 +139,9 @@ public sealed class DirectiveEngineService : IDirectiveEngineService
                     DirectiveType = d.DirectiveType,
                     Severity = d.Severity,
                     Message = d.Message,
+                    Symptom = d.Symptom,
+                    Reason = d.Reason,
+                    Action = d.Action,
                     Score = d.Score,
                     HealthStatus = d.HealthStatus,
                     TriggeredAt = d.TriggeredAt,
@@ -151,7 +154,7 @@ public sealed class DirectiveEngineService : IDirectiveEngineService
 
     private static IReadOnlyList<Directive> EvaluateAdBatch(int userId, RawInsight r, ComputedMetric c)
     {
-        var (score, health) = AdCreativeScore.Compute(r, c);
+        var (score, health, _, _, _) = AdCreativeScore.Compute(r, c);
         return DirectiveRules.EvaluateAd(userId, r, c, score, health);
     }
 }
