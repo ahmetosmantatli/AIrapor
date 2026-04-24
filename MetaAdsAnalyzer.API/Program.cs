@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -109,6 +110,10 @@ builder.Services.AddSwaggerGen(
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                   ?? Array.Empty<string>();
+static bool IsAllowedCorsOrigin(string[] allowed, string? origin) =>
+    !string.IsNullOrEmpty(origin) &&
+    allowed.Any(o => string.Equals(o.TrimEnd('/'), origin.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
+
 builder.Services.AddCors(
     options =>
     {
@@ -142,6 +147,47 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseForwardedHeaders();
+    // 500 vb. hatalarda ASP.NET bazen CORS başlığı eklemez; tarayıcı yalnızca "CORS" yazar, gerçek sebep kaybolur.
+    app.UseExceptionHandler(
+        errorApp =>
+        {
+            errorApp.Run(
+                async context =>
+                {
+                    var ex = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+                    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("UnhandledException");
+                    if (ex != null)
+                    {
+                        logger.LogError(ex, "İşlenmeyen sunucu hatası");
+                    }
+
+                    var origin = context.Request.Headers.Origin.ToString();
+                    if (IsAllowedCorsOrigin(corsOrigins, origin))
+                    {
+                        context.Response.Headers.Append("Access-Control-Allow-Origin", origin);
+                        context.Response.Headers.Append(
+                            "Access-Control-Allow-Headers",
+                            "Content-Type, Authorization, Accept");
+                        context.Response.Headers.Append(
+                            "Access-Control-Allow-Methods",
+                            "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+                    }
+
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    await context.Response
+                        .WriteAsJsonAsync(
+                            new
+                            {
+                                title = "Sunucu hatası",
+                                detail =
+                                    "Ayrıntı sunucu günlüğünde. Yaygın neden: veritabanı bağlantısı veya migration eksikliği.",
+                            },
+                            cancellationToken: context.RequestAborted)
+                        .ConfigureAwait(false);
+                });
+        });
 }
 
 app.UseHttpsRedirection();
