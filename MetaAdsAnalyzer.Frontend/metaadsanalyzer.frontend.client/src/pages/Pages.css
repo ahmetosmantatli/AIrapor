@@ -845,6 +845,99 @@ code {
   gap: 0.7rem;
 }
 
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.impact-card {
+  border: 1px solid hsl(var(--border));
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.impact-card:hover {
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--muted) / 0.2);
+}
+
+.impact-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.impact-card-body {
+  margin-top: 0.2rem;
+}
+
+.impact-modal {
+  width: min(1100px, 100%);
+}
+
+.impact-modal-chart {
+  margin: 0.75rem 0 1rem;
+}
+
+.impact-modal-subtitle {
+  font-size: 0.95rem;
+  margin-bottom: 0.45rem;
+}
+
+.impact-simple-chart {
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.impact-simple-chart-canvas {
+  width: 100%;
+  height: 180px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.07), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.6rem;
+}
+
+.impact-trend-points {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.impact-banner {
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 0.6rem;
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+}
+
+.impact-banner-warn {
+  background: rgba(234, 179, 8, 0.18);
+  border-color: rgba(234, 179, 8, 0.45);
+  color: #fde68a;
+}
+
+.impact-banner-orange {
+  background: rgba(249, 115, 22, 0.16);
+  border-color: rgba(249, 115, 22, 0.45);
+  color: #fdba74;
+}
+
+.impact-banner-info {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.42);
+  color: #bfdbfe;
+}
+
 .analyzed-row {
   width: 100%;
   border: 1px solid hsl(var(--border));
@@ -1317,6 +1410,9 @@ code {
 }
 
 @media (max-width: 920px) {
+  .impact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .campaign-row {
     grid-template-columns: 1fr;
   }
@@ -1455,6 +1551,9 @@ code {
 }
 
 @media (max-width: 760px) {
+  .impact-grid {
+    grid-template-columns: 1fr;
+  }
   .dashboard-mini-stats {
     grid-template-columns: 1fr 1fr;
   }

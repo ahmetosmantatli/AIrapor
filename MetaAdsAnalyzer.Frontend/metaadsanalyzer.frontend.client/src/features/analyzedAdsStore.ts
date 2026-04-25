@@ -80,8 +80,10 @@ export type AnalyzedAdItem = {
     skippedAt?: string | null
     beforeRoas?: number | null
     beforeSpend?: number | null
+    beforePurchases?: number | null
     afterRoas?: number | null
     afterSpend?: number | null
+    afterPurchases?: number | null
     impactMeasuredAt?: string | null
     metaChangeDetected?: boolean
     metaChangeMessage?: string | null
@@ -118,8 +120,10 @@ function mapSavedReport(x: SavedReportItem): AnalyzedAdItem {
       skippedAt: s.skippedAt,
       beforeRoas: s.beforeRoas,
       beforeSpend: s.beforeSpend,
+      beforePurchases: s.beforePurchases,
       afterRoas: s.afterRoas,
       afterSpend: s.afterSpend,
+      afterPurchases: s.afterPurchases,
       impactMeasuredAt: s.impactMeasuredAt,
       metaChangeDetected: s.metaChangeDetected,
       metaChangeMessage: s.metaChangeMessage,

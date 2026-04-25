@@ -25,7 +25,8 @@ export function Dashboard() {
   const chartInstanceRef = useRef<any>(null)
   const [name, setName] = useState('Kullanıcı')
   const [lastUpdateText, setLastUpdateText] = useState('—')
-  const [dateFilter, setDateFilter] = useState<'7' | '14' | '30'>('14')
+  const [dateFilter, setDateFilter] = useState<'14' | '30' | '90'>('30')
+  const [refreshTick, setRefreshTick] = useState(0)
   const [campaignId, setCampaignId] = useState<string>('all')
   const [campaigns, setCampaigns] = useState<MetaCampaignItem[]>([])
   const [accountsCount, setAccountsCount] = useState(1)
@@ -111,11 +112,11 @@ export function Dashboard() {
     return filteredCampaignRows.filter((r) => new Date(`${r.dateStart}T00:00:00`).getTime() >= startDate.getTime())
   }, [filteredCampaignRows, startDate])
 
-  const dailyMap14 = useMemo(() => {
+  const dailyMapWindow = useMemo(() => {
     const map = new Map<string, { ciro: number; spend: number; net: number }>()
     const d = new Date()
     d.setHours(0, 0, 0, 0)
-    for (let i = 13; i >= 0; i--) {
+    for (let i = dayWindow - 1; i >= 0; i--) {
       const t = new Date(d)
       t.setDate(d.getDate() - i)
       const key = t.toISOString().slice(0, 10)
@@ -131,7 +132,7 @@ export function Dashboard() {
       map.set(key, cur)
     }
     return map
-  }, [filteredCampaignRows])
+  }, [filteredCampaignRows, dayWindow])
 
   const kpi = useMemo(() => {
     const byDay = new Map<string, { ciro: number; spend: number }>()
@@ -171,12 +172,12 @@ export function Dashboard() {
       activeCampaigns,
       adsetCount,
       accountsCount,
-      sum14: [...dailyMap14.values()].reduce(
+      sumWindow: [...dailyMapWindow.values()].reduce(
         (a, v) => ({ ciro: a.ciro + v.ciro, spend: a.spend + v.spend, net: a.net + v.net }),
         { ciro: 0, spend: 0, net: 0 },
       ),
     }
-  }, [inWindowRows, campaigns, filteredAdsetRows, dailyMap14, accountsCount])
+  }, [inWindowRows, campaigns, filteredAdsetRows, dailyMapWindow, accountsCount])
 
   useEffect(() => {
     let cancelled = false
@@ -218,7 +219,7 @@ export function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [userId, campaignId])
+  }, [userId, campaignId, refreshTick])
 
   useEffect(() => {
     const ensureChartScript = async () => {
@@ -240,12 +241,12 @@ export function Dashboard() {
         chartInstanceRef.current.destroy()
       }
 
-      const labels = [...dailyMap14.keys()].map((d) => {
+      const labels = [...dailyMapWindow.keys()].map((d) => {
         const dt = new Date(`${d}T00:00:00`)
         return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`
       })
-      const ciro = [...dailyMap14.values()].map((x) => x.ciro)
-      const net = [...dailyMap14.values()].map((x) => x.net)
+      const ciro = [...dailyMapWindow.values()].map((x) => x.ciro)
+      const net = [...dailyMapWindow.values()].map((x) => x.net)
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
       gradient.addColorStop(0, 'rgba(129,140,248,0.85)')
       gradient.addColorStop(1, 'rgba(79,70,229,0.35)')
@@ -315,7 +316,7 @@ export function Dashboard() {
         chartInstanceRef.current = null
       }
     }
-  }, [dailyMap14])
+  }, [dailyMapWindow])
 
   return (
     <div className="page dashboard-v2">
@@ -337,10 +338,10 @@ export function Dashboard() {
         <div className="form-row">
           <label>
             Tarih filtresi
-            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as '7' | '14' | '30')}>
-              <option value="7">Son 7 gün</option>
+            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as '14' | '30' | '90')}>
               <option value="14">Son 14 gün</option>
               <option value="30">Son 30 gün</option>
+              <option value="90">Son 90 gün</option>
             </select>
           </label>
           <label>
@@ -353,6 +354,18 @@ export function Dashboard() {
                 </option>
               ))}
             </select>
+          </label>
+          <label>
+            &nbsp;
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setRefreshTick((x) => x + 1)}
+              disabled={loading}
+              title="Seçili gün ve kampanyaya göre verileri yeniden getir"
+            >
+              {loading ? 'Yükleniyor…' : 'Refresh'}
+            </button>
           </label>
         </div>
       </div>
@@ -400,7 +413,7 @@ export function Dashboard() {
               <div className="dashboard-v2-head">
                 <div>
                   <h2 className="panel-title">Kar / Zarar eğrisi</h2>
-                  <p className="muted small">MUHASEBE · SON 14 GÜN</p>
+                  <p className="muted small">{`MUHASEBE · SON ${dayWindow} GÜN`}</p>
                 </div>
                 <Link to="/app/analysis" className="muted small">Detayı aç →</Link>
               </div>
@@ -408,10 +421,10 @@ export function Dashboard() {
                 <canvas ref={chartRef} />
               </div>
               <div className="dashboard-mini-stats">
-                <div><span>14 gün ciro</span><strong>₺{kpi.sum14.ciro.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
-                <div><span>14 gün reklam</span><strong>₺{kpi.sum14.spend.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
-                <div><span>14 gün gider</span><strong>₺{kpi.sum14.spend.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
-                <div><span>14 gün net kar</span><strong className={kpi.sum14.net >= 0 ? 'dashboard-pos' : 'dashboard-neg'}>₺{kpi.sum14.net.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
+                <div><span>{dayWindow} gün ciro</span><strong>₺{kpi.sumWindow.ciro.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
+                <div><span>{dayWindow} gün reklam</span><strong>₺{kpi.sumWindow.spend.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
+                <div><span>{dayWindow} gün gider</span><strong>₺{kpi.sumWindow.spend.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
+                <div><span>{dayWindow} gün net kar</span><strong className={kpi.sumWindow.net >= 0 ? 'dashboard-pos' : 'dashboard-neg'}>₺{kpi.sumWindow.net.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</strong></div>
               </div>
             </article>
 

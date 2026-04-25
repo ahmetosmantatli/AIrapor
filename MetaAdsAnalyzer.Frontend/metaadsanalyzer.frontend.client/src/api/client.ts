@@ -326,11 +326,15 @@ export async function postSelectActiveMetaAdAccount(
 export async function getRawInsights(
   userId: number,
   level?: string,
-  opts?: { campaignId?: string },
+  opts?: { campaignId?: string; adId?: string; limit?: number },
 ): Promise<RawInsightRow[]> {
   const params = new URLSearchParams()
   if (level) params.set('level', level)
   if (opts?.campaignId) params.set('campaignId', opts.campaignId)
+  if (opts?.adId) params.set('adId', opts.adId)
+  if (typeof opts?.limit === 'number' && Number.isFinite(opts.limit) && opts.limit > 0) {
+    params.set('limit', String(Math.trunc(opts.limit)))
+  }
   const q = params.toString() ? `?${params.toString()}` : ''
   const res = await authFetch(`/api/raw-insights/by-user/${userId}${q}`, {
     headers: { Accept: 'application/json' },
