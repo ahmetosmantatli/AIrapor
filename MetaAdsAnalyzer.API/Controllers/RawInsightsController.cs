@@ -27,6 +27,8 @@ public class RawInsightsController : ControllerBase
         int userId,
         [FromQuery] string? level,
         [FromQuery] string? campaignId,
+        [FromQuery] string? adId,
+        [FromQuery] int? limit,
         CancellationToken cancellationToken)
     {
         if (userId <= 0)
@@ -52,10 +54,18 @@ public class RawInsightsController : ControllerBase
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var q = _db.RawInsights.AsNoTracking().ForUserActiveAdAccount(userId, activeMeta);
+        var hasAdId = !string.IsNullOrWhiteSpace(adId);
+        // adId ile nokta atışı sorguda aktif hesap filtresi sonucu gizleyebildiği için user+ad bazlı sorgu yap.
+        var q = hasAdId
+            ? _db.RawInsights.AsNoTracking().Where(r => r.UserId == userId)
+            : _db.RawInsights.AsNoTracking().ForUserActiveAdAccount(userId, activeMeta);
         if (levelNorm is not null)
         {
             q = q.Where(r => r.Level == levelNorm);
+        }
+        else if (hasAdId)
+        {
+            q = q.Where(r => r.Level == "ad");
         }
 
         if (!string.IsNullOrWhiteSpace(campaignId))
@@ -63,10 +73,19 @@ public class RawInsightsController : ControllerBase
             var campaignIdNorm = campaignId.Trim();
             q = q.Where(r => r.MetaCampaignId == campaignIdNorm);
         }
+        if (hasAdId)
+        {
+            var adIdNorm = adId!.Trim();
+            q = q.Where(r => r.EntityId == adIdNorm);
+        }
+
+        var take = limit.HasValue && limit.Value > 0
+            ? Math.Min(limit.Value, MaxRows)
+            : MaxRows;
 
         var raws = await q
             .OrderByDescending(r => r.FetchedAt)
-            .Take(MaxRows)
+            .Take(take)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 

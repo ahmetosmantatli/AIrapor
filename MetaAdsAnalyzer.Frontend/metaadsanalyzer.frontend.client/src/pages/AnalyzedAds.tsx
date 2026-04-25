@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listAnalyzedAds, type AnalyzedAdItem, updateRecommendationStatus } from '../features/analyzedAdsStore'
+import { getRawInsights } from '../api/client'
+import type { RawInsightRow } from '../api/types'
 import { useUser } from '../context/UserContext'
 import './Pages.css'
 
@@ -29,9 +31,8 @@ function grade(a: AnalyzedAdItem): { letter: string; breakdown: string[] } {
 type DetailTab = 'funnel' | 'timeline' | 'metrics'
 type FunnelStep = { label: string; value: number; lossPct: number | null; lostCount: number }
 
-function buildFunnel(a: AnalyzedAdItem): FunnelStep[] {
-  const isVideo = Boolean(a.aggregate.videoP25 || a.aggregate.videoP50 || a.aggregate.videoP75 || a.aggregate.videoP100)
-  const agg = a.aggregate
+function buildFunnel(agg: AnalyzedAdItem['aggregate']): FunnelStep[] {
+  const isVideo = Boolean(agg.videoP25 || agg.videoP50 || agg.videoP75 || agg.videoP100)
   const steps = isVideo
     ? [
         { label: 'Gösterim', value: agg.impressions },
@@ -89,6 +90,7 @@ export function AnalyzedAds() {
   const [active, setActive] = useState<AnalyzedAdItem | null>(null)
   const [detailTab, setDetailTab] = useState<DetailTab>('funnel')
   const [listTab, setListTab] = useState<'pending' | 'completed'>('pending')
+  const [activeRawLatest, setActiveRawLatest] = useState<RawInsightRow | null>(null)
 
   const rows = useMemo(() => items, [items])
   const pendingRows = useMemo(
@@ -115,6 +117,47 @@ export function AnalyzedAds() {
   useEffect(() => {
     refresh()
   }, [userId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!active) {
+      setActiveRawLatest(null)
+      return
+    }
+    ;(async () => {
+      try {
+        const rows = await getRawInsights(userId, 'ad')
+        if (cancelled) return
+        const latest = rows
+          .filter((r) => r.entityId === active.adId)
+          .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))[0] ?? null
+        setActiveRawLatest(latest)
+      } catch {
+        if (!cancelled) setActiveRawLatest(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [active, userId])
+
+  const activeAggregate = useMemo(() => {
+    if (!active) return null
+    const base = active.aggregate
+    const raw = activeRawLatest
+    if (!raw) return base
+    return {
+      ...base,
+      spend: base.spend > 0 ? base.spend : raw.spend,
+      impressions: base.impressions > 0 ? base.impressions : raw.impressions,
+      linkClicks: base.linkClicks > 0 ? base.linkClicks : raw.linkClicks,
+      purchases: base.purchases > 0 ? base.purchases : raw.purchases,
+      videoPlay3s: base.videoPlay3s > 0 ? base.videoPlay3s : raw.videoPlay3s,
+      videoP100: base.videoP100 > 0 ? base.videoP100 : raw.videoP100,
+      roas: base.roas ?? raw.roas ?? null,
+      cpa: base.cpa ?? raw.cpa ?? null,
+    }
+  }, [active, activeRawLatest])
 
   return (
     <div className="page">
@@ -242,7 +285,7 @@ export function AnalyzedAds() {
               <div className="vr-funnel">
                 <h3>Dönüşüm Hunisi</h3>
                 <div className="vr-funnel-list">
-                  {buildFunnel(active).map((step, i, all) => {
+                  {buildFunnel(activeAggregate ?? active.aggregate).map((step, i, all) => {
                     const width = Math.max(28, 100 - i * 8)
                     const highDrop = (step.lossPct ?? 0) > 70
                     return (
@@ -267,7 +310,13 @@ export function AnalyzedAds() {
                 <div className="vr-timeline-points">
                   {[25, 50, 75, 100].map((pctVal) => {
                     const value =
-                      pctVal === 25 ? active.aggregate.videoP25 : pctVal === 50 ? active.aggregate.videoP50 : pctVal === 75 ? active.aggregate.videoP75 : active.aggregate.videoP100
+                      pctVal === 25
+                        ? (activeAggregate ?? active.aggregate).videoP25
+                        : pctVal === 50
+                          ? (activeAggregate ?? active.aggregate).videoP50
+                          : pctVal === 75
+                            ? (activeAggregate ?? active.aggregate).videoP75
+                            : (activeAggregate ?? active.aggregate).videoP100
                     return (
                       <div key={pctVal} className="vr-timeline-point" style={{ left: `${pctVal}%` }}>
                         <span>{pctVal}%</span>
@@ -292,11 +341,11 @@ export function AnalyzedAds() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td>İlk 3 Saniye İzleme (Hook Rate)</td><td>{pct(active.aggregate.thumbstopPct)}</td><td>Ort: %25 · İyi: &gt;%30</td><td>{statusIcon((active.aggregate.thumbstopPct ?? 0) > 20, (active.aggregate.thumbstopPct ?? 0) >= 10 && (active.aggregate.thumbstopPct ?? 0) <= 20)}</td></tr>
-                    <tr><td>İçerik Tutma Gücü (Hold Rate)</td><td>{pct(active.aggregate.holdPct)}</td><td>Ort: %20 · İyi: &gt;%25</td><td>{statusIcon((active.aggregate.holdPct ?? 0) > 15, (active.aggregate.holdPct ?? 0) >= 8 && (active.aggregate.holdPct ?? 0) <= 15)}</td></tr>
-                    <tr><td>Link Tıklama Oranı (CTR)</td><td>{pct(active.aggregate.ctrLinkPct)}</td><td>Ort: %1.2 · İyi: &gt;%2</td><td>{statusIcon((active.aggregate.ctrLinkPct ?? 0) > 1, (active.aggregate.ctrLinkPct ?? 0) >= 0.5 && (active.aggregate.ctrLinkPct ?? 0) <= 1)}</td></tr>
-                    <tr><td>Satın Alma Dönüşümü (CVR)</td><td>{pct(active.aggregate.linkCvrPct)}</td><td>Ort: %1.5 · İyi: &gt;%3</td><td>{statusIcon((active.aggregate.linkCvrPct ?? 0) > 1, (active.aggregate.linkCvrPct ?? 0) >= 0.5 && (active.aggregate.linkCvrPct ?? 0) <= 1)}</td></tr>
-                    <tr><td>Yatırım Getirisi (ROAS)</td><td>{(active.aggregate.roas ?? 0).toFixed(2)}x</td><td>Ort: 2.5x · İyi: &gt;4x</td><td>{statusIcon((active.aggregate.targetRoas ?? 0) > 0 && (active.aggregate.roas ?? 0) > (active.aggregate.targetRoas ?? 0), (active.aggregate.breakEvenRoas ?? 0) > 0 && (active.aggregate.roas ?? 0) > (active.aggregate.breakEvenRoas ?? 0))}</td></tr>
+                    <tr><td>İlk 3 Saniye İzleme (Hook Rate)</td><td>{pct((activeAggregate ?? active.aggregate).thumbstopPct)}</td><td>Ort: %25 · İyi: &gt;%30</td><td>{statusIcon(((activeAggregate ?? active.aggregate).thumbstopPct ?? 0) > 20, ((activeAggregate ?? active.aggregate).thumbstopPct ?? 0) >= 10 && ((activeAggregate ?? active.aggregate).thumbstopPct ?? 0) <= 20)}</td></tr>
+                    <tr><td>İçerik Tutma Gücü (Hold Rate)</td><td>{pct((activeAggregate ?? active.aggregate).holdPct)}</td><td>Ort: %20 · İyi: &gt;%25</td><td>{statusIcon(((activeAggregate ?? active.aggregate).holdPct ?? 0) > 15, ((activeAggregate ?? active.aggregate).holdPct ?? 0) >= 8 && ((activeAggregate ?? active.aggregate).holdPct ?? 0) <= 15)}</td></tr>
+                    <tr><td>Link Tıklama Oranı (CTR)</td><td>{pct((activeAggregate ?? active.aggregate).ctrLinkPct)}</td><td>Ort: %1.2 · İyi: &gt;%2</td><td>{statusIcon(((activeAggregate ?? active.aggregate).ctrLinkPct ?? 0) > 1, ((activeAggregate ?? active.aggregate).ctrLinkPct ?? 0) >= 0.5 && ((activeAggregate ?? active.aggregate).ctrLinkPct ?? 0) <= 1)}</td></tr>
+                    <tr><td>Satın Alma Dönüşümü (CVR)</td><td>{pct((activeAggregate ?? active.aggregate).linkCvrPct)}</td><td>Ort: %1.5 · İyi: &gt;%3</td><td>{statusIcon(((activeAggregate ?? active.aggregate).linkCvrPct ?? 0) > 1, ((activeAggregate ?? active.aggregate).linkCvrPct ?? 0) >= 0.5 && ((activeAggregate ?? active.aggregate).linkCvrPct ?? 0) <= 1)}</td></tr>
+                    <tr><td>Yatırım Getirisi (ROAS)</td><td>{((activeAggregate ?? active.aggregate).roas ?? 0).toFixed(2)}x</td><td>Ort: 2.5x · İyi: &gt;4x</td><td>{statusIcon(((activeAggregate ?? active.aggregate).targetRoas ?? 0) > 0 && ((activeAggregate ?? active.aggregate).roas ?? 0) > ((activeAggregate ?? active.aggregate).targetRoas ?? 0), ((activeAggregate ?? active.aggregate).breakEvenRoas ?? 0) > 0 && ((activeAggregate ?? active.aggregate).roas ?? 0) > ((activeAggregate ?? active.aggregate).breakEvenRoas ?? 0))}</td></tr>
                   </tbody>
                 </table>
               </div>

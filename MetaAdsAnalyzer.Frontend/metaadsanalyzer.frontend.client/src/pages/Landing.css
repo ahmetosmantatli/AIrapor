@@ -14,58 +14,58 @@
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
-.landing-page--pink {
-  --bg-main: #2a061f;
-  --text-main: #ffe8f6;
-  --text-muted: #f5b4dd;
-  --card-bg: rgba(255, 105, 180, 0.12);
-  --card-border: rgba(255, 105, 180, 0.42);
-  --accent: #ff4da6;
-  --accent-soft: rgba(255, 77, 166, 0.22);
+.landing-page--light {
+  --bg-main: #f7f8fc;
+  --text-main: #141826;
+  --text-muted: #4b5568;
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-border: rgba(99, 102, 241, 0.2);
+  --accent: #4f46e5;
+  --accent-soft: rgba(99, 102, 241, 0.12);
 }
 
-.landing-page--pink .lp-grid-bg {
+.landing-page--light .lp-grid-bg {
   background-image:
-    linear-gradient(to right, rgba(255, 105, 180, 0.16) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 105, 180, 0.16) 1px, transparent 1px);
+    linear-gradient(to right, rgba(99, 102, 241, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.12) 1px, transparent 1px);
 }
 
-.landing-page--pink .lp-glow-orb {
-  background: radial-gradient(circle, rgba(255, 77, 166, 0.32), transparent 72%);
+.landing-page--light .lp-glow-orb {
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.24), transparent 72%);
 }
 
-.landing-page--pink .lp-badge {
-  border-color: rgba(255, 105, 180, 0.65);
-  color: #ffd2eb;
-  background: rgba(255, 105, 180, 0.16);
+.landing-page--light .lp-badge {
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #3730a3;
+  background: rgba(99, 102, 241, 0.1);
 }
 
-.landing-page--pink .lp-badge-dot {
-  background: #ff4da6;
-  box-shadow: 0 0 12px #ff4da6;
+.landing-page--light .lp-badge-dot {
+  background: #4f46e5;
+  box-shadow: 0 0 12px #818cf8;
 }
 
-.landing-page--pink .lp-card:hover {
-  border-color: rgba(255, 105, 180, 0.85);
+.landing-page--light .lp-card:hover {
+  border-color: rgba(99, 102, 241, 0.55);
 }
 
-.landing-page--pink .lp-card-glow {
-  background: rgba(255, 77, 166, 0.28);
+.landing-page--light .lp-card-glow {
+  background: rgba(99, 102, 241, 0.18);
 }
 
-.landing-page--pink .lp-arrow {
-  color: #ff9fd0;
+.landing-page--light .lp-arrow {
+  color: #6366f1;
 }
 
-.landing-page--pink .lp-pill--indigo {
-  color: #ffe6f3;
-  background: rgba(255, 77, 166, 0.2);
-  border-color: rgba(255, 77, 166, 0.55);
+.landing-page--light .lp-pill--indigo {
+  color: #312e81;
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.35);
 }
 
-.landing-page--pink .marketing-btn--primary {
-  background: linear-gradient(135deg, #ff4da6, #ff7abf) !important;
-  border-color: #ff4da6 !important;
+.landing-page--light .marketing-btn--primary {
+  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+  border-color: #4f46e5 !important;
 }
 
 .lp-hero {

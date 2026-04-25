@@ -185,6 +185,8 @@ export type VideoReportAggregateResponse = {
   targetRoas: number | null
   maxCpa: number | null
   targetCpa: number | null
+  netProfitPerOrder: number | null
+  netMarginPct: number | null
   hasProductMap: boolean
   dataQuality: {
     insufficientImpressions: boolean

@@ -58,6 +58,39 @@
     @apply min-h-svh bg-background text-foreground antialiased;
   }
 
+  body.theme-light {
+    --background: 0 0% 98%;
+    --foreground: 240 10% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 12%;
+    --primary: 239 84% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 18% 94%;
+    --secondary-foreground: 240 10% 20%;
+    --muted: 240 16% 94%;
+    --muted-foreground: 240 8% 44%;
+    --accent: 239 84% 60%;
+    --accent-foreground: 0 0% 100%;
+    --border: 240 14% 86%;
+    --input: 240 14% 86%;
+    --ring: 239 84% 60%;
+    --bg: #f6f7fb;
+    --text-h: #171923;
+    --text: #4b5563;
+    --text-muted: #6b7280;
+    --surface: #ffffff;
+    --surface-2: #f3f4f6;
+    --code-bg: #eef2ff;
+    --brand-500: #6366f1;
+    --brand-600: #4f46e5;
+    --brand-700: #818cf8;
+    --accent-legacy: #6366f1;
+    --accent-bg: rgba(99, 102, 241, 0.12);
+    --accent-border: rgba(99, 102, 241, 0.35);
+  }
+
   #root {
     @apply min-h-svh w-full text-start;
   }

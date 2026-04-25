@@ -5,15 +5,14 @@ import {
   ImageIcon,
   Activity,
   LayoutDashboard,
-  LayoutGrid,
   Link2,
   LogOut,
-  Package,
   Settings,
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useUser } from '../context/UserContext'
+import { useAppTheme } from '../theme/appTheme'
 
 const nav: Array<{
   to: string
@@ -27,8 +26,6 @@ const nav: Array<{
   { to: '/app/analyzed-ads', label: 'Analiz edilen reklamlar', icon: BarChart3 },
   { to: '/app/impact-tracking', label: 'Etki Takibi', icon: Activity },
   { to: '/app/creatives', label: 'Kreatif', icon: ImageIcon },
-  { to: '/app/products', label: 'Ürünler', icon: Package },
-  { to: '/app/campaigns', label: 'Kampanyalar', icon: LayoutGrid },
   { to: '/app/settings', label: 'Ayarlar', icon: Settings },
   { to: '/connect', label: 'Meta', icon: Link2 },
 ]
@@ -40,6 +37,7 @@ const titleByPath: Record<string, string> = {
 
 export function Layout() {
   const { email, logout } = useUser()
+  const { theme, toggleTheme } = useAppTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const title =
@@ -53,10 +51,10 @@ export function Layout() {
         <div className="flex items-center gap-2 border-b border-border px-4 py-4">
           <Link to="/app" className="flex items-center gap-2 no-underline">
             <span className="grid size-9 place-items-center rounded-lg bg-primary text-xs font-extrabold text-primary-foreground">
-              RA
+              AD
             </span>
             <div className="leading-tight">
-              <div className="text-sm font-semibold tracking-tight">Reklam Analiz</div>
+              <div className="text-sm font-semibold tracking-tight">Adlyz</div>
               <div className="text-[11px] text-muted-foreground">Portal</div>
             </div>
           </Link>
@@ -95,6 +93,9 @@ export function Layout() {
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
           <h1 className="text-sm font-medium tracking-tight text-muted-foreground md:text-base">{title}</h1>
           <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={toggleTheme}>
+              {theme === 'dark' ? 'Karanlık Mod' : 'Aydınlık Mod'}
+            </Button>
             <span className="hidden max-w-[200px] truncate text-xs text-muted-foreground sm:inline" title={email ?? ''}>
               {email ?? '—'}
             </span>

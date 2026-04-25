@@ -1426,7 +1426,7 @@ code {
 }
 
 .dashboard-v2 {
-  background: #0a0a0f;
+  background: hsl(var(--background));
 }
 
 .dashboard-v2-top {
@@ -1439,8 +1439,8 @@ code {
 
 .dashboard-v2 .stat-card,
 .dashboard-v2 .panel {
-  background: #12121a;
-  border-color: #1e1e2e;
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
 }
 
 .dashboard-v2-grid {
@@ -1463,10 +1463,10 @@ code {
 
 .dashboard-chart-wrap {
   height: 320px;
-  border: 1px solid #1e1e2e;
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
   padding: 16px;
-  background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%);
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%);
 }
 
 .dashboard-mini-stats {
@@ -1477,10 +1477,10 @@ code {
 }
 
 .dashboard-mini-stats div {
-  border: 1px solid #1e1e2e;
+  border: 1px solid hsl(var(--border));
   border-radius: 10px;
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: hsl(var(--background) / 0.55);
 }
 
 .dashboard-mini-stats span {
@@ -1507,9 +1507,10 @@ code {
   grid-template-columns: 28px 1fr auto;
   gap: 0.55rem;
   align-items: start;
-  border: 1px solid #1e1e2e;
+  border: 1px solid hsl(var(--border));
   border-radius: 10px;
   padding: 0.5rem;
+  background: hsl(var(--card));
 }
 
 .dashboard-action-clickable {
@@ -1517,12 +1518,12 @@ code {
 }
 
 .dashboard-action-clickable:hover {
-  border-color: #2b2b44;
-  background: rgba(99, 102, 241, 0.06);
+  border-color: hsl(var(--ring));
+  background: var(--accent-bg);
 }
 
 .dashboard-action-arrow {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-weight: 700;
   margin-top: 0.25rem;
 }

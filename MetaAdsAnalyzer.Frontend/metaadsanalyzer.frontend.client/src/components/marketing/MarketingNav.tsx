@@ -51,8 +51,8 @@ export function MarketingNav({ variant = 'bar' }: Props) {
       )}
       <div className="marketing-nav__inner">
         <Link to="/" className="marketing-nav__logo">
-          <span className="marketing-nav__mark">RA</span>
-          <span className="marketing-nav__title">Reklam Analiz</span>
+          <span className="marketing-nav__mark">AD</span>
+          <span className="marketing-nav__title">Adlyz</span>
         </Link>
         <nav className="marketing-nav__links" aria-label="Üst menü">
           {variant === 'hero' && (

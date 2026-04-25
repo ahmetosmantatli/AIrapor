@@ -61,6 +61,10 @@ public sealed class VideoReportAggregateResponseDto
 
     public decimal? TargetCpa { get; set; }
 
+    public decimal? NetProfitPerOrder { get; set; }
+
+    public decimal? NetMarginPct { get; set; }
+
     public bool HasProductMap { get; set; }
 
     public VideoReportDataQualityDto DataQuality { get; set; } = new();

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getRawInsights } from '../api/client'
+import { getRawInsights, postInsightsSync } from '../api/client'
 import { listAnalyzedAds } from '../features/analyzedAdsStore'
 import { useUser } from '../context/UserContext'
 import './Pages.css'
@@ -19,7 +19,7 @@ type TrendPoint = {
 
 type ImpactRow = {
   reportId: number
-  suggestionId: number
+  suggestionId: string
   adName: string
   adId: string
   appliedAt: string
@@ -35,10 +35,28 @@ type ImpactRow = {
   trend: TrendPoint[]
 }
 
+function normalizeEntityId(value: string | null | undefined): string {
+  return (value ?? '').trim()
+}
+
+function extractDigits(value: string): string {
+  return value.replace(/\D+/g, '')
+}
+
+function sameAdId(left: string, right: string): boolean {
+  const a = normalizeEntityId(left)
+  const b = normalizeEntityId(right)
+  if (!a || !b) return false
+  if (a === b) return true
+  const da = extractDigits(a)
+  const db = extractDigits(b)
+  return da.length >= 6 && db.length >= 6 && da === db
+}
+
 export function ImpactTracking() {
   const { userId } = useUser()
   const [rows, setRows] = useState<ImpactRow[]>([])
-  const [expandedSuggestionId, setExpandedSuggestionId] = useState<number | null>(null)
+  const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null)
   const [latestRawRoas, setLatestRawRoas] = useState<number | null>(null)
   const [latestRawAt, setLatestRawAt] = useState<string | null>(null)
   const threeHostRef = useRef<HTMLDivElement | null>(null)
@@ -76,7 +94,7 @@ export function ImpactTracking() {
               }))
             flat.push({
               reportId: Number(r.id) || 0,
-              suggestionId: Number(s.id) || 0,
+              suggestionId: String(s.id),
               adName: r.adName ?? r.adId,
               adId: r.adId,
               appliedAt,
@@ -140,15 +158,33 @@ export function ImpactTracking() {
     }
     ;(async () => {
       try {
+        // Kart açıldığında ilgili reklam için güncel insight çekmeyi dener.
+        await postInsightsSync(userId, 'ad', 'last_90d', { adId: expandedRow.adId }).catch(() => undefined)
         const rows = await getRawInsights(userId, 'ad', { adId: expandedRow.adId, limit: 1 })
         if (cancelled) return
-        const r = rows[0]
-        setLatestRawRoas(r?.roas ?? null)
-        setLatestRawAt(r?.fetchedAt ?? null)
+        const appliedAtMs = new Date(expandedRow.appliedAt).getTime()
+        const adRows = rows
+          .filter((r) => sameAdId(r.entityId, expandedRow.adId))
+          .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))
+        const latestAfterApplied = adRows.find(
+          (r) => r.roas != null && Number.isFinite(r.roas) && new Date(r.fetchedAt).getTime() >= appliedAtMs,
+        )
+        const latestAny = adRows.find((r) => r.roas != null && Number.isFinite(r.roas))
+        const trendLatest = [...expandedRow.trend]
+          .filter((t) => t.roas != null && Number.isFinite(t.roas))
+          .sort((a, b) => b.at.localeCompare(a.at))[0]
+        const selected = latestAfterApplied ?? latestAny ?? null
+        setLatestRawRoas(
+          selected?.roas ?? trendLatest?.roas ?? expandedRow.afterRoas ?? expandedRow.beforeRoas ?? null,
+        )
+        setLatestRawAt(selected?.fetchedAt ?? trendLatest?.at ?? expandedRow.appliedAt ?? null)
       } catch {
         if (!cancelled) {
-          setLatestRawRoas(null)
-          setLatestRawAt(null)
+          const trendLatest = [...expandedRow.trend]
+            .filter((t) => t.roas != null && Number.isFinite(t.roas))
+            .sort((a, b) => b.at.localeCompare(a.at))[0]
+          setLatestRawRoas(trendLatest?.roas ?? expandedRow.afterRoas ?? expandedRow.beforeRoas ?? null)
+          setLatestRawAt(trendLatest?.at ?? expandedRow.appliedAt ?? null)
         }
       }
     })()
@@ -356,7 +392,7 @@ export function ImpactTracking() {
             : null
           return (
             <div
-              key={r.suggestionId}
+              key={`${r.reportId}-${r.suggestionId}-${r.appliedAt}`}
               className="impact-card"
               onClick={() => {
                 setExpandedSuggestionId(r.suggestionId)

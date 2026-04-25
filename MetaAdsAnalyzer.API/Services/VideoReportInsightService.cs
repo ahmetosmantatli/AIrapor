@@ -145,6 +145,10 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
         decimal denMaxCpa = 0;
         decimal wTargetCpa = 0;
         decimal denTargetCpa = 0;
+        decimal wNetProfitPerOrder = 0;
+        decimal denNetProfitPerOrder = 0;
+        decimal wNetMarginPct = 0;
+        decimal denNetMarginPct = 0;
 
         foreach (var raw in latestByAd.Values)
         {
@@ -225,6 +229,18 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
                     wTargetCpa += c.TargetCpa.Value * raw.Spend;
                     denTargetCpa += raw.Spend;
                 }
+
+                if (c.NetProfitPerOrder is not null && raw.Spend > 0)
+                {
+                    wNetProfitPerOrder += c.NetProfitPerOrder.Value * raw.Spend;
+                    denNetProfitPerOrder += raw.Spend;
+                }
+
+                if (c.NetMarginPct is not null && raw.Spend > 0)
+                {
+                    wNetMarginPct += c.NetMarginPct.Value * raw.Spend;
+                    denNetMarginPct += raw.Spend;
+                }
             }
         }
 
@@ -239,6 +255,8 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
         var target = denTg > 0 ? wTg / denTg : (decimal?)null;
         var maxCpa = denMaxCpa > 0 ? wMaxCpa / denMaxCpa : (decimal?)null;
         var targetCpa = denTargetCpa > 0 ? wTargetCpa / denTargetCpa : (decimal?)null;
+        var netProfitPerOrder = denNetProfitPerOrder > 0 ? wNetProfitPerOrder / denNetProfitPerOrder : (decimal?)null;
+        var netMarginPct = denNetMarginPct > 0 ? wNetMarginPct / denNetMarginPct : (decimal?)null;
         int? creativeScore = denScore > 0 ? (int)Math.Round(wScore / denScore, MidpointRounding.AwayFromZero) : null;
         var campaignIds = latestByAd.Values
             .Select(r => r.MetaCampaignId?.Trim())
@@ -304,6 +322,8 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
             TargetRoas = target,
             MaxCpa = maxCpa,
             TargetCpa = targetCpa,
+            NetProfitPerOrder = netProfitPerOrder,
+            NetMarginPct = netMarginPct,
             HasProductMap = hasProductMap,
             DataQuality = new VideoReportDataQualityDto
             {

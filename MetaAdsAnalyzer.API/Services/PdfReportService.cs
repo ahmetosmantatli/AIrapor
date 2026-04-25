@@ -68,7 +68,7 @@ public sealed class PdfReportService : IPdfReportService
                             .Row(
                                 row =>
                                 {
-                                    row.RelativeItem().Text("Meta Reklam Analiz Raporu").SemiBold().FontSize(16);
+                                    row.RelativeItem().Text("Adlyz Meta Reklam Raporu").SemiBold().FontSize(16);
                                     row.ConstantItem(120).AlignRight().Text(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm") + " UTC").FontSize(9);
                                 });
 

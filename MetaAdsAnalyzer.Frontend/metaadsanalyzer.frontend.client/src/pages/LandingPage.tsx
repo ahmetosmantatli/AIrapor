@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MarketingNav } from '../components/marketing/MarketingNav'
+import { useAppTheme } from '../theme/appTheme'
 import './Landing.css'
 
 declare global {
@@ -14,7 +15,7 @@ const threeCdn = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min
 export function LandingPage() {
   const navigate = useNavigate()
   const canvasHostRef = useRef<HTMLDivElement | null>(null)
-  const [theme, setTheme] = useState<'dark' | 'pink'>('dark')
+  const { theme, toggleTheme } = useAppTheme()
 
   useEffect(() => {
     let mounted = true
@@ -245,9 +246,9 @@ export function LandingPage() {
           <button
             type="button"
             className="lp-theme-toggle"
-            onClick={() => setTheme((p) => (p === 'dark' ? 'pink' : 'dark'))}
+            onClick={toggleTheme}
           >
-            {theme === 'dark' ? 'Pembe Mod' : 'Koyu Mod'}
+            {theme === 'dark' ? 'Karanlık Mod' : 'Aydınlık Mod'}
           </button>
 
           <div className="lp-hero-layout">
@@ -267,10 +268,7 @@ export function LandingPage() {
               </p>
               <div className="lp-hero-cta">
                 <Link to="/register" className="marketing-btn marketing-btn--primary marketing-btn--lg">
-                  Ücretsiz Analiz Başlat
-                </Link>
-                <Link to="/login" className="marketing-btn marketing-btn--outline marketing-btn--lg">
-                  Demo Gör
+                  Hemen Başla
                 </Link>
               </div>
             </div>
@@ -414,7 +412,7 @@ export function LandingPage() {
             <span>Veriler asla satilmaz</span>
           </div>
           <div className="lp-final-cta">
-            <h2>Ilk Analizinizi Ucretsiz Yapin</h2>
+            <h2>Hemen Baslayin</h2>
             <Link to="/register" className="marketing-btn marketing-btn--primary marketing-btn--lg">
               Kayit ol
             </Link>
@@ -424,14 +422,14 @@ export function LandingPage() {
 
       <footer className="lp-footer">
         <div className="lp-footer-inner">
-          <div className="lp-footer-logo">Reklam Analiz</div>
+          <div className="lp-footer-logo">Adlyz</div>
           <div className="lp-footer-links">
             <Link to="/register">Kayit</Link>
             <Link to="/login">Giris</Link>
             <a href="#neden">Ozellikler</a>
           </div>
         </div>
-        <div className="lp-footer-bottom">© 2026 Reklam Analiz</div>
+        <div className="lp-footer-bottom">© 2026 Adlyz</div>
       </footer>
     </div>
   )

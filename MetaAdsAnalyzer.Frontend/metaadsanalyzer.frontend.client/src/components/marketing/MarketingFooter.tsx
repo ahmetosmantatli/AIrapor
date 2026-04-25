@@ -6,9 +6,9 @@ export function MarketingFooter() {
     <footer className="marketing-footer">
       <div className="marketing-footer__inner">
         <div className="marketing-footer__brand">
-          <span className="marketing-nav__mark">RA</span>
+          <span className="marketing-nav__mark">AD</span>
           <div>
-            <strong>Reklam Analiz</strong>
+            <strong>Adlyz</strong>
             <p className="marketing-footer__tag">
               Meta reklamlarınızı kural tabanlı metriklerle analiz edin.
             </p>
@@ -43,7 +43,7 @@ export function MarketingFooter() {
         </div>
       </div>
       <div className="marketing-footer__bottom">
-        <span>© {new Date().getFullYear()} Reklam Analiz</span>
+        <span>© {new Date().getFullYear()} Adlyz</span>
       </div>
     </footer>
   )

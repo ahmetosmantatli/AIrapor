@@ -7,6 +7,7 @@ import {
   getMetaAdsets,
   getMetaAds,
   getMetaCampaigns,
+  getCampaignMaps,
   getRawInsights,
   getUserProfile,
   postDirectivesEvaluate,
@@ -14,6 +15,8 @@ import {
   postMetricsRecompute,
   postSelectActiveMetaAdAccount,
   postVideoReportAggregate,
+  createProduct,
+  createCampaignMap,
 } from '../api/client'
 import type {
   DirectiveItem,
@@ -25,7 +28,7 @@ import type {
   VideoReportAggregateResponse,
 } from '../api/types'
 import { useUser } from '../context/UserContext'
-import { addAnalyzedAd } from '../features/analyzedAdsStore'
+import { addAnalyzedAd, updateRecommendationStatus, type AnalyzedAdItem } from '../features/analyzedAdsStore'
 import './Pages.css'
 
 const PRESETS = [
@@ -190,6 +193,9 @@ function sanitizeVideoAggregate(raw: VideoReportAggregateResponse): VideoReportA
     targetRoas: raw.targetRoas != null && Number.isFinite(raw.targetRoas) ? raw.targetRoas : null,
     maxCpa: raw.maxCpa != null && Number.isFinite(raw.maxCpa) ? raw.maxCpa : null,
     targetCpa: raw.targetCpa != null && Number.isFinite(raw.targetCpa) ? raw.targetCpa : null,
+    netProfitPerOrder:
+      raw.netProfitPerOrder != null && Number.isFinite(raw.netProfitPerOrder) ? raw.netProfitPerOrder : null,
+    netMarginPct: raw.netMarginPct != null && Number.isFinite(raw.netMarginPct) ? raw.netMarginPct : null,
     hasProductMap: raw.hasProductMap === true,
     dataQuality: {
       insufficientImpressions: raw.dataQuality?.insufficientImpressions === true,
@@ -244,6 +250,15 @@ export function VideoReport() {
   const [appliedRecIds, setAppliedRecIds] = useState<Set<string>>(new Set())
   const [skippedRecIds, setSkippedRecIds] = useState<Set<string>>(new Set())
   const [showDataQualityBanner, setShowDataQualityBanner] = useState(true)
+  const [savedAnalyzedItem, setSavedAnalyzedItem] = useState<AnalyzedAdItem | null>(null)
+  const [profitabilityModalOpen, setProfitabilityModalOpen] = useState(false)
+  const [pendingAnalyzeAdId, setPendingAnalyzeAdId] = useState<string | null>(null)
+  const [savingProfitability, setSavingProfitability] = useState(false)
+  const [salePriceInput, setSalePriceInput] = useState('')
+  const [cogsInput, setCogsInput] = useState('')
+  const [shippingInput, setShippingInput] = useState('')
+  const [feePctInput, setFeePctInput] = useState('2.9')
+  const [profitabilityErrors, setProfitabilityErrors] = useState<string[]>([])
 
   const spendByAdId = useMemo(() => buildSpendByAdId(rawsForSpend), [rawsForSpend])
 
@@ -490,7 +505,8 @@ export function VideoReport() {
 
       const dList = await getActiveDirectives(userId)
       const dirs = dList.filter((d) => d.entityType === 'ad' && adIds.includes(d.entityId))
-      setMergedDirectives(mergeDirectives(dirs))
+      const mergedDirs = mergeDirectives(dirs)
+      setMergedDirectives(mergedDirs)
 
       const aggRaw = await postVideoReportAggregate({ userId, adIds, metaAdAccountId: activeAct })
       setAggregate(sanitizeVideoAggregate(aggRaw))
@@ -498,9 +514,10 @@ export function VideoReport() {
       setResultModalOpen(true)
       setAppliedRecIds(new Set())
       setSkippedRecIds(new Set())
+      setSavedAnalyzedItem(null)
       const firstAd = group.ads[0]
       if (firstAd) {
-        await addAnalyzedAd({
+        const saved = await addAnalyzedAd({
           userId,
           adId: firstAd.id,
           adName: firstAd.name?.trim() || firstAd.creativeName?.trim() || firstAd.id,
@@ -510,8 +527,9 @@ export function VideoReport() {
           adsetId: selectedAdsetId,
           adsetName: adsets.find((x) => x.id === selectedAdsetId)?.name ?? selectedAdsetId,
           aggregate: sanitizeVideoAggregate(aggRaw),
-          directives: dirs,
+          directives: mergedDirs,
         })
+        setSavedAnalyzedItem(saved)
       }
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -529,7 +547,7 @@ export function VideoReport() {
     }
   }
 
-  async function runPickedAdAnalysis(adId?: string) {
+  async function runPickedAdAnalysisCore(adId?: string) {
     const targetId = adId ?? pickerAdId
     if (!targetId) return
     const ad = ads.find((x) => x.id === targetId)
@@ -553,6 +571,56 @@ export function VideoReport() {
     }
     setPickerOpen(false)
     await runAnalysisForAds(group, [ad.id])
+  }
+
+  async function ensureCampaignProfitabilityMapOrPrompt(targetAdId: string): Promise<boolean> {
+    if (!selectedCampaignId) return true
+    try {
+      const maps = await getCampaignMaps(userId)
+      const hasMap = maps.some((m) => m.campaignId === selectedCampaignId)
+      if (hasMap) return true
+      setPendingAnalyzeAdId(targetAdId)
+      setProfitabilityModalOpen(true)
+      return false
+    } catch {
+      return true
+    }
+  }
+
+  async function runPickedAdAnalysis(adId?: string) {
+    const targetId = adId ?? pickerAdId
+    if (!targetId) return
+    const ok = await ensureCampaignProfitabilityMapOrPrompt(targetId)
+    if (!ok) return
+    await runPickedAdAnalysisCore(targetId)
+  }
+
+  function parseOptionalNumber(raw: string): number | null | 'invalid' {
+    const v = raw.trim()
+    if (!v) return null
+    const n = Number(v.replace(',', '.'))
+    if (!Number.isFinite(n)) return 'invalid'
+    return n
+  }
+
+  function validateProfitabilityInputs(): string[] {
+    const errs: string[] = []
+    const sale = parseOptionalNumber(salePriceInput)
+    const cogs = parseOptionalNumber(cogsInput)
+    const shipping = parseOptionalNumber(shippingInput)
+    const fee = parseOptionalNumber(feePctInput)
+
+    if (sale === 'invalid') errs.push('Satış fiyatı yalnızca sayısal değer olmalıdır.')
+    if (cogs === 'invalid') errs.push('Ürün maliyeti yalnızca sayısal değer olmalıdır.')
+    if (shipping === 'invalid') errs.push('Kargo maliyeti yalnızca sayısal değer olmalıdır.')
+    if (fee === 'invalid') errs.push('Ödeme komisyonu yalnızca sayısal değer olmalıdır.')
+
+    if (typeof sale === 'number' && sale <= 0) errs.push('Satış fiyatı 0’dan büyük olmalıdır.')
+    if (typeof cogs === 'number' && cogs < 0) errs.push('Ürün maliyeti negatif olamaz.')
+    if (typeof shipping === 'number' && shipping < 0) errs.push('Kargo maliyeti negatif olamaz.')
+    if (typeof fee === 'number' && (fee < 0 || fee > 100)) errs.push('Ödeme komisyonu %0 ile %100 arasında olmalıdır.')
+
+    return errs
   }
 
   function onApplyRecommendation(recId: string, message: string) {
@@ -744,10 +812,11 @@ export function VideoReport() {
                 </div>
                 <div className="vr-recs">
                   <h3>ÖNERİLER</h3>
-                  {(mergedDirectives.length > 0 ? mergedDirectives : []).slice(0, 4).map((d) => {
+                  {(mergedDirectives.length > 0 ? mergedDirectives : []).slice(0, 4).map((d, idx) => {
                     const recId = `dir-${d.id}`
                     const isApplied = appliedRecIds.has(recId)
                     const isSkipped = skippedRecIds.has(recId)
+                    const persistedRec = savedAnalyzedItem?.recommendations?.[idx]
                     return (
                     <div key={d.id} className="vr-rec-row">
                       <span className={`vr-priority ${d.severity === 'critical' ? 'vr-priority-high' : 'vr-priority-mid'}`}>
@@ -763,8 +832,30 @@ export function VideoReport() {
                         </span>
                       )}
                       <div className="vr-rec-actions">
-                        <button type="button" className="btn" onClick={() => onSkipRecommendation(recId, d.message)}>Atla</button>
-                        <button type="button" className="btn primary" onClick={() => onApplyRecommendation(recId, d.message)}>Uygula</button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            onSkipRecommendation(recId, d.message)
+                            if (persistedRec?.id) {
+                              void updateRecommendationStatus(savedAnalyzedItem?.id ?? '', persistedRec.id, 'skipped')
+                            }
+                          }}
+                        >
+                          Atla
+                        </button>
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={() => {
+                            onApplyRecommendation(recId, d.message)
+                            if (persistedRec?.id) {
+                              void updateRecommendationStatus(savedAnalyzedItem?.id ?? '', persistedRec.id, 'applied')
+                            }
+                          }}
+                        >
+                          Uygula
+                        </button>
                       </div>
                     </div>
                   )})}
@@ -774,6 +865,7 @@ export function VideoReport() {
                         const recId = 'fallback-rec'
                         const isApplied = appliedRecIds.has(recId)
                         const isSkipped = skippedRecIds.has(recId)
+                        const persistedRec = savedAnalyzedItem?.recommendations?.[0]
                         return (
                           <>
                       <span className="vr-priority vr-priority-mid">ORTA</span>
@@ -787,8 +879,30 @@ export function VideoReport() {
                         </span>
                       )}
                       <div className="vr-rec-actions">
-                        <button type="button" className="btn" onClick={() => onSkipRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')}>Atla</button>
-                        <button type="button" className="btn primary" onClick={() => onApplyRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')}>Uygula</button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            onSkipRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')
+                            if (persistedRec?.id) {
+                              void updateRecommendationStatus(savedAnalyzedItem?.id ?? '', persistedRec.id, 'skipped')
+                            }
+                          }}
+                        >
+                          Atla
+                        </button>
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={() => {
+                            onApplyRecommendation(recId, 'Hook/Hold kreatif varyant önerisi')
+                            if (persistedRec?.id) {
+                              void updateRecommendationStatus(savedAnalyzedItem?.id ?? '', persistedRec.id, 'applied')
+                            }
+                          }}
+                        >
+                          Uygula
+                        </button>
                       </div>
                           </>
                         )
@@ -867,7 +981,7 @@ export function VideoReport() {
                   <tr>
                     <td>Basabas ROAS</td>
                     <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
-                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `${numFmt(aggregate.breakEvenRoas)}x`}
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : <span style={{ color: '#ef4444' }}>{`${numFmt(aggregate.breakEvenRoas)}x`}</span>}
                     </td>
                     <td>—</td>
                     <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
@@ -892,6 +1006,22 @@ export function VideoReport() {
                     <td>Hedef CPA</td>
                     <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — Ürünler/Kampanyalar eşlemesi gerekli' : undefined}>
                       {!aggregate.hasProductMap ? '🔒 Kilitli' : `₺${numFmt(aggregate.targetCpa)}`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                  <tr>
+                    <td>Net kar / sipariş</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — kampanya ürün eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `₺${numFmt(aggregate.netProfitPerOrder)}`}
+                    </td>
+                    <td>—</td>
+                    <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
+                  </tr>
+                  <tr>
+                    <td>Net kar marjı</td>
+                    <td className={!aggregate.hasProductMap ? 'vr-locked-cell' : ''} title={!aggregate.hasProductMap ? 'Maliyet bilgisi eksik — kampanya ürün eşlemesi gerekli' : undefined}>
+                      {!aggregate.hasProductMap ? '🔒 Kilitli' : `${numFmt(aggregate.netMarginPct)}%`}
                     </td>
                     <td>—</td>
                     <td>{aggregate.hasProductMap ? '✅' : '🔒'}</td>
@@ -1019,6 +1149,122 @@ export function VideoReport() {
                 )})}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {profitabilityModalOpen && (
+        <div className="vr-modal-overlay" role="dialog" aria-modal="true" aria-label="Karlılık analizi ekle">
+          <div className="vr-modal" style={{ maxWidth: '680px' }}>
+            <button
+              type="button"
+              className="vr-modal-close"
+              onClick={() => {
+                setProfitabilityModalOpen(false)
+                setPendingAnalyzeAdId(null)
+                setProfitabilityErrors([])
+              }}
+              aria-label="Kapat"
+            >
+              ×
+            </button>
+            <h2 className="panel-title">Karlılık Analizi Ekle (İsteğe Bağlı)</h2>
+            <p className="muted small" style={{ marginBottom: '0.9rem' }}>
+              Ürün maliyetinizi girerek net kar, break-even ROAS ve hedef CPA hesaplamalarını aktif edebilirsiniz.
+            </p>
+            <div className="form-stack" style={{ maxWidth: '26rem' }}>
+              <label>
+                Satış fiyatı (₺)
+                <input type="number" min="0" step="0.01" value={salePriceInput} onChange={(e) => setSalePriceInput(e.target.value)} inputMode="decimal" />
+              </label>
+              <label>
+                Ürün maliyeti / COGS (₺)
+                <input type="number" min="0" step="0.01" value={cogsInput} onChange={(e) => setCogsInput(e.target.value)} inputMode="decimal" />
+              </label>
+              <label>
+                Kargo maliyeti (₺)
+                <input type="number" min="0" step="0.01" value={shippingInput} onChange={(e) => setShippingInput(e.target.value)} inputMode="decimal" />
+              </label>
+              <label>
+                Ödeme komisyonu % (varsayılan 2.9)
+                <input type="number" min="0" max="100" step="0.01" value={feePctInput} onChange={(e) => setFeePctInput(e.target.value)} inputMode="decimal" />
+              </label>
+            </div>
+            {profitabilityErrors.length > 0 && (
+              <p className="error-banner" style={{ marginTop: '0.75rem' }}>
+                {profitabilityErrors[0]}
+              </p>
+            )}
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={savingProfitability}
+                onClick={() => {
+                  const adId = pendingAnalyzeAdId
+                  setProfitabilityModalOpen(false)
+                  setPendingAnalyzeAdId(null)
+                  setProfitabilityErrors([])
+                  if (adId) void runPickedAdAnalysisCore(adId)
+                }}
+              >
+                Atla
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={savingProfitability || !pendingAnalyzeAdId || !selectedCampaignId}
+                onClick={() => {
+                  void (async () => {
+                    if (!pendingAnalyzeAdId || !selectedCampaignId) return
+                    setSavingProfitability(true)
+                    setError(null)
+                    try {
+                      const validationErrors = validateProfitabilityInputs()
+                      if (validationErrors.length > 0) {
+                        setProfitabilityErrors(validationErrors)
+                        return
+                      }
+                      setProfitabilityErrors([])
+                      const toNum = (v: string, fallback = 0) => {
+                        const n = Number(v.replace(',', '.').trim())
+                        return Number.isFinite(n) ? n : fallback
+                      }
+                      const salePrice = Math.max(1, toNum(salePriceInput, 1))
+                      const cogs = Math.max(0, toNum(cogsInput, 0))
+                      const shipping = Math.max(0, toNum(shippingInput, 0))
+                      const feePct = Math.max(0, toNum(feePctInput, 2.9))
+                      const product = await createProduct({
+                        userId,
+                        name: `Kampanya ${selectedCampaignId} ürünü`,
+                        sellingPrice: salePrice,
+                        cogs,
+                        shippingCost: shipping,
+                        paymentFeePct: feePct,
+                        returnRatePct: 0,
+                        ltvMultiplier: 1,
+                        targetMarginPct: 30,
+                      })
+                      await createCampaignMap({
+                        userId,
+                        campaignId: selectedCampaignId,
+                        productId: product.id,
+                      })
+                      setProfitabilityModalOpen(false)
+                      const adId = pendingAnalyzeAdId
+                      setPendingAnalyzeAdId(null)
+                      setProfitabilityErrors([])
+                      await runPickedAdAnalysisCore(adId)
+                    } catch (e: unknown) {
+                      setError(e instanceof Error ? e.message : 'Karlılık bilgisi kaydedilemedi')
+                    } finally {
+                      setSavingProfitability(false)
+                    }
+                  })()
+                }}
+              >
+                {savingProfitability ? 'Kaydediliyor…' : 'Kaydet ve Analiz Et'}
+              </button>
+            </div>
           </div>
         </div>
       )}
