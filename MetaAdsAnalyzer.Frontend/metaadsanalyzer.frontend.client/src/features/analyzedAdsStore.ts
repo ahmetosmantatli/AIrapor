@@ -39,6 +39,8 @@ function sanitizeAggregate(raw: unknown): VideoReportAggregateResponse {
     targetRoas: nn(a.targetRoas),
     maxCpa: nn(a.maxCpa),
     targetCpa: nn(a.targetCpa),
+    netProfitPerOrder: nn(a.netProfitPerOrder),
+    netMarginPct: nn(a.netMarginPct),
     hasProductMap: a.hasProductMap === true,
     dataQuality: {
       insufficientImpressions: a.dataQuality?.insufficientImpressions === true,

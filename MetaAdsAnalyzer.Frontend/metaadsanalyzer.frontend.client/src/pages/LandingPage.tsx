@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MarketingNav } from '../components/marketing/MarketingNav'
 import { useAppTheme } from '../theme/appTheme'
