@@ -267,7 +267,7 @@ public class SavedReportsController : ControllerBase
         suggestion.BeforePurchases = (int)Math.Clamp(raw.Purchases, 0, int.MaxValue);
         suggestion.BeforeRoas = comp?.Roas ?? (raw.Spend > 0 ? raw.PurchaseValue / raw.Spend : null);
         suggestion.BeforeHookRate = comp?.ThumbstopRatePct ?? (raw.Impressions > 0 ? raw.VideoPlay3s * 100m / raw.Impressions : null);
-        suggestion.BeforeHoldRate = comp?.HoldRate ?? (raw.VideoPlay3s > 0 ? raw.VideoP50 * 100m / raw.VideoPlay3s : null);
+        suggestion.BeforeHoldRate = comp?.HoldRate ?? (raw.VideoPlay3s > 0 ? raw.VideoThruplay * 100m / raw.VideoPlay3s : null);
     }
 }
 

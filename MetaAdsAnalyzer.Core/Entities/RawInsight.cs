@@ -37,6 +37,9 @@ public class RawInsight
     [MaxLength(64)]
     public string? MetaAdAccountId { get; set; }
 
+    [MaxLength(32)]
+    public string AttributionWindow { get; set; } = "7d_click_1d_view";
+
     public DateOnly DateStart { get; set; }
 
     public DateOnly DateStop { get; set; }

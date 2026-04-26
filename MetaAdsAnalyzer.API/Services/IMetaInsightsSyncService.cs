@@ -9,6 +9,7 @@ public interface IMetaInsightsSyncService
         string? adId = null,
         string? metaAdAccountId = null,
         IReadOnlyList<string>? adIds = null,
+        bool force = false,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<MetaAdAccountItemDto>> ListAdAccountsAsync(

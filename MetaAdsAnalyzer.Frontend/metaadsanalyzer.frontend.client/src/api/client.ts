@@ -9,6 +9,7 @@ import type {
   DirectiveItem,
   HealthResponse,
   InsightsSyncResult,
+  InsightsRefreshResult,
   MetricsRecomputeResult,
   ProductResponse,
   RawInsightRow,
@@ -191,6 +192,16 @@ export async function postInsightsSync(
     ...(opts?.adIds?.length ? { adIds: opts.adIds } : {}),
     ...(opts?.adId ? { adId: opts.adId } : {}),
     ...(opts?.metaAdAccountId ? { metaAdAccountId: opts.metaAdAccountId } : {}),
+  })
+}
+
+export async function postInsightsRefresh(
+  userId: number,
+  metaAdAccountId?: string | null,
+): Promise<InsightsRefreshResult> {
+  return postJson<InsightsRefreshResult>('/api/meta/insights/refresh', {
+    userId,
+    ...(metaAdAccountId ? { metaAdAccountId } : {}),
   })
 }
 

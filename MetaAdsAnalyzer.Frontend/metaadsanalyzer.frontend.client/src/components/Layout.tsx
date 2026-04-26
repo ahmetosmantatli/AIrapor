@@ -9,8 +9,10 @@ import {
   LogOut,
   Settings,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { getUserProfile, postInsightsRefresh } from '../api/client'
 import { useUser } from '../context/UserContext'
 import { useAppTheme } from '../theme/appTheme'
 
@@ -36,14 +38,52 @@ const titleByPath: Record<string, string> = {
 }
 
 export function Layout() {
-  const { email, logout } = useUser()
+  const { email, logout, userId } = useUser()
   const { theme, toggleTheme } = useAppTheme()
   const navigate = useNavigate()
   const location = useLocation()
+  const [refreshState, setRefreshState] = useState<'ready' | 'loading' | 'success' | 'limit'>('ready')
+  const [lastSyncText, setLastSyncText] = useState<string>('—')
+  const [activeAct, setActiveAct] = useState<string | null>(null)
   const title =
     titleByPath[location.pathname] ??
     nav.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)))?.label ??
     'Portal'
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const p = await getUserProfile(userId)
+        if (!cancelled) setActiveAct(p.metaAdAccountId ?? null)
+      } catch {
+        if (!cancelled) setActiveAct(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  async function onRefreshClick() {
+    setRefreshState('loading')
+    try {
+      const res = await postInsightsRefresh(userId, activeAct)
+      if (res.status === 'limit') {
+        setRefreshState('limit')
+      } else {
+        setRefreshState('success')
+      }
+      if (res.lastSync) {
+        const mins = Math.max(0, Math.round((Date.now() - new Date(res.lastSync).getTime()) / 60000))
+        setLastSyncText(`${mins} dk once`)
+      }
+    } catch {
+      setRefreshState('ready')
+    } finally {
+      window.setTimeout(() => setRefreshState('ready'), 1800)
+    }
+  }
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
@@ -93,6 +133,18 @@ export function Layout() {
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
           <h1 className="text-sm font-medium tracking-tight text-muted-foreground md:text-base">{title}</h1>
           <div className="flex items-center gap-3">
+            <div className="hidden sm:block">
+              <Button variant="outline" size="sm" onClick={() => void onRefreshClick()} disabled={refreshState === 'loading'}>
+                {refreshState === 'loading'
+                  ? 'Guncelleniyor...'
+                  : refreshState === 'success'
+                    ? '✓ Guncellendi'
+                    : refreshState === 'limit'
+                      ? 'Limit doldu'
+                      : '↻ Verileri Guncelle'}
+              </Button>
+              <div className="mt-1 text-[11px] text-muted-foreground">Son guncelleme: {lastSyncText}</div>
+            </div>
             <Button variant="outline" size="sm" onClick={toggleTheme}>
               {theme === 'dark' ? 'Karanlık Mod' : 'Aydınlık Mod'}
             </Button>

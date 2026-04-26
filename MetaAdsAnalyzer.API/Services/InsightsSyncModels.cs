@@ -25,6 +25,13 @@ public sealed class InsightsSyncRequestDto
     public string? MetaAdAccountId { get; set; }
 }
 
+public sealed class InsightsRefreshRequestDto
+{
+    public int UserId { get; set; }
+
+    public string? MetaAdAccountId { get; set; }
+}
+
 public sealed class InsightsSyncResponseDto
 {
     public int RowsFetched { get; set; }
@@ -32,6 +39,17 @@ public sealed class InsightsSyncResponseDto
     public int RowsUpserted { get; set; }
 
     public int PageCount { get; set; }
+}
+
+public sealed class InsightsRefreshResponseDto
+{
+    public string Status { get; set; } = "ok";
+
+    public string Message { get; set; } = string.Empty;
+
+    public DateTimeOffset? LastSync { get; set; }
+
+    public int? DailyCount { get; set; }
 }
 
 public sealed class MetaAdAccountItemDto

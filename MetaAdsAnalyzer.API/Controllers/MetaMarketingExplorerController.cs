@@ -2,6 +2,7 @@ using MetaAdsAnalyzer.API.Security;
 using MetaAdsAnalyzer.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
 
 namespace MetaAdsAnalyzer.API.Controllers;
 
@@ -52,6 +53,12 @@ public sealed class MetaMarketingExplorerController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (HttpRequestException)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Meta servisine şu anda erişilemiyor. Lütfen biraz sonra tekrar deneyin." });
+        }
     }
 
     /// <summary>Kampanyaya ait reklam setleri (<c>campaignId</c> zorunlu).</summary>
@@ -89,6 +96,12 @@ public sealed class MetaMarketingExplorerController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Meta servisine şu anda erişilemiyor. Lütfen biraz sonra tekrar deneyin." });
         }
     }
 }

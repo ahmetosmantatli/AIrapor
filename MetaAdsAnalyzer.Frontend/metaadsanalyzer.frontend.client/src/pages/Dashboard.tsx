@@ -6,7 +6,7 @@ import {
   getMetaCampaigns,
   getRawInsights,
   listSavedReportImpacts,
-  postInsightsSync,
+  postInsightsRefresh,
   getUserProfile,
 } from '../api/client'
 import type { DirectiveItem, MetaCampaignItem, RawInsightRow, SavedReportImpactFeedItem } from '../api/types'
@@ -102,10 +102,6 @@ export function Dashboard() {
   }, [lastFetchedAt])
 
   const dayWindow = Number(dateFilter)
-  const syncPreset = useMemo<'last_14d' | 'last_30d' | 'last_90d'>(
-    () => (dayWindow >= 90 ? 'last_90d' : dayWindow >= 30 ? 'last_30d' : 'last_14d'),
-    [dayWindow],
-  )
   const startDate = useMemo(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
@@ -199,12 +195,6 @@ export function Dashboard() {
         const email = me.email ?? profile.email ?? ''
         const username = email.split('@')[0]?.trim() || 'Kullanıcı'
         const act = profile.metaAdAccountId ?? undefined
-        // Dashboard her açılış/refresh'te güncel snapshot için önce hızlı senkron dener.
-        await Promise.allSettled([
-          postInsightsSync(userId, 'campaign', syncPreset, { metaAdAccountId: act }),
-          postInsightsSync(userId, 'adset', syncPreset, { metaAdAccountId: act }),
-          postInsightsSync(userId, 'ad', syncPreset, { metaAdAccountId: act }),
-        ])
         const [cs, rc, ra, rad] = await Promise.all([
           getMetaCampaigns(userId, act),
           getRawInsights(userId, 'campaign', campaignId === 'all' ? undefined : { campaignId }),
@@ -230,7 +220,7 @@ export function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [userId, campaignId, refreshTick, syncPreset])
+  }, [userId, campaignId, refreshTick])
 
   useEffect(() => {
     const ensureChartScript = async () => {
@@ -371,7 +361,13 @@ export function Dashboard() {
             <button
               type="button"
               className="btn"
-              onClick={() => setRefreshTick((x) => x + 1)}
+              onClick={() => {
+                void (async () => {
+                  const profile = await getUserProfile(userId)
+                  await postInsightsRefresh(userId, profile.metaAdAccountId ?? undefined)
+                  setRefreshTick((x) => x + 1)
+                })()
+              }}
               disabled={loading}
               title="Seçili gün ve kampanyaya göre verileri yeniden getir"
             >

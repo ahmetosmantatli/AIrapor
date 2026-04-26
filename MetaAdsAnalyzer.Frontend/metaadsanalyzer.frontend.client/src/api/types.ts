@@ -54,6 +54,13 @@ export type InsightsSyncResult = {
   pageCount: number
 }
 
+export type InsightsRefreshResult = {
+  status: 'updated' | 'skipped' | 'limit'
+  message: string
+  lastSync: string | null
+  dailyCount?: number | null
+}
+
 export type LinkedMetaAdAccountItem = {
   id: number
   metaAdAccountId: string

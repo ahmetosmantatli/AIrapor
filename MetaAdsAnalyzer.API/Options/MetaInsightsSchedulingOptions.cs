@@ -8,7 +8,7 @@ public sealed class MetaInsightsSchedulingOptions
 {
     public const string SectionName = "MetaInsightsScheduling";
 
-    public bool Enabled { get; set; }
+    public bool Enabled { get; set; } = true;
 
     /// <summary>Ana döngü uyku süresi (saniye).</summary>
     public int TickSeconds { get; set; } = 60;

@@ -515,7 +515,10 @@ internal static class DirectiveRules
         int? score,
         string? healthStatus)
     {
-        var message = $"Semptom: {symptom}\nNeden: {reason}\nAksiyon: {action}";
+        var safeReason = string.IsNullOrWhiteSpace(reason)
+            ? $"Performans sinyali mevcut seviyede — {symptom}"
+            : reason;
+        var message = $"Semptom: {symptom}\nNeden: {safeReason}\nAksiyon: {action}";
         return
         new()
         {
@@ -526,7 +529,7 @@ internal static class DirectiveRules
             Severity = severity,
             Message = message,
             Symptom = symptom,
-            Reason = reason,
+            Reason = safeReason,
             Action = action,
             Score = score,
             HealthStatus = healthStatus,

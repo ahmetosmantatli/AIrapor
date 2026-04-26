@@ -61,11 +61,17 @@ public sealed class SuggestionImpactMeasurementService : BackgroundService
         {
             var userId = s.SavedReport.UserId;
             var adId = s.SavedReport.AdId;
+            var appliedAt = s.AppliedAt ?? DateTimeOffset.UtcNow;
             var fromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
             var raws = await db.RawInsights.AsNoTracking()
                 .Where(r => r.UserId == userId && r.Level == "ad" && r.EntityId == adId && r.DateStart >= fromDate)
                 .OrderByDescending(r => r.FetchedAt)
                 .ToListAsync(ct);
+
+            var latestBeforeRaw = await db.RawInsights.AsNoTracking()
+                .Where(r => r.UserId == userId && r.Level == "ad" && r.EntityId == adId && r.FetchedAt <= appliedAt)
+                .OrderByDescending(r => r.FetchedAt)
+                .FirstOrDefaultAsync(ct);
 
             if (raws.Count == 0)
             {
@@ -77,34 +83,50 @@ public sealed class SuggestionImpactMeasurementService : BackgroundService
             var purchaseValue = raws.Sum(x => x.PurchaseValue);
             var purchases = raws.Sum(x => x.Purchases);
             var impressions = raws.Sum(x => x.Impressions);
+            var linkClicks = raws.Sum(x => x.LinkClicks);
             var video3s = raws.Sum(x => x.VideoPlay3s);
-            var videoP50 = raws.Sum(x => x.VideoP50);
 
             s.AfterSpend = spend;
             s.AfterPurchases = (int)Math.Clamp(purchases, 0, int.MaxValue);
             s.AfterRoas = spend > 0 ? purchaseValue / spend : null;
             s.AfterHookRate = impressions > 0 ? video3s * 100m / impressions : null;
-            s.AfterHoldRate = video3s > 0 ? videoP50 * 100m / video3s : null;
+            s.AfterHoldRate = video3s > 0 ? raws.Sum(x => x.VideoThruplay) * 100m / video3s : null;
+
+            var beforeHook = s.BeforeHookRate ?? (latestBeforeRaw is { Impressions: > 0 } ? latestBeforeRaw.VideoPlay3s * 100m / latestBeforeRaw.Impressions : null);
+            var beforeHold = s.BeforeHoldRate ?? (latestBeforeRaw is { VideoPlay3s: > 0 } ? latestBeforeRaw.VideoThruplay * 100m / latestBeforeRaw.VideoPlay3s : null);
+            var beforeCtr = latestBeforeRaw is { Impressions: > 0 } ? latestBeforeRaw.LinkClicks * 100m / latestBeforeRaw.Impressions : (decimal?)null;
+            var afterCtr = impressions > 0 ? linkClicks * 100m / impressions : (decimal?)null;
 
             var roasDelta = DeltaPct(s.BeforeRoas, s.AfterRoas);
-            var hookDelta = DeltaPct(s.BeforeHookRate, s.AfterHookRate);
-            var holdDelta = DeltaPct(s.BeforeHoldRate, s.AfterHoldRate);
+            var hookDelta = DeltaPct(beforeHook, s.AfterHookRate);
+            var holdDelta = DeltaPct(beforeHold, s.AfterHoldRate);
             var spendDelta = DeltaPct(s.BeforeSpend, s.AfterSpend);
+            var ctrDelta = afterCtr is not null && beforeCtr is not null ? afterCtr.Value - beforeCtr.Value : (decimal?)null;
             var purchasesDiff = (s.AfterPurchases ?? 0) - (s.BeforePurchases ?? 0);
 
-            var meaningful =
+            var genericMeaningful =
                 AbsAtLeast(roasDelta, 10m)
                 || AbsAtLeast(hookDelta, 10m)
                 || AbsAtLeast(holdDelta, 10m)
                 || AbsAtLeast(spendDelta, 20m)
                 || Math.Abs(purchasesDiff) >= 1;
 
+            var (hasSpecificRule, specificMeaningful, specificFailMessage) = EvaluateDirectiveSpecificMeaningful(
+                s.DirectiveType,
+                s.Message,
+                hookDelta,
+                holdDelta,
+                ctrDelta,
+                spendDelta);
+
+            var meaningful = hasSpecificRule ? specificMeaningful : genericMeaningful;
+
             if (!meaningful)
             {
                 s.MetaChangeDetected = false;
-                s.MetaChangeMessage =
-                    "Öneriyi uygulandı olarak işaretlediniz ancak Meta tarafında anlamlı bir değişim tespit edilmedi. " +
-                    "Lütfen Meta Ads Manager üzerinden değişiklikleri kontrol edin.";
+                s.MetaChangeMessage = hasSpecificRule
+                    ? specificFailMessage
+                    : "Öneriyi uygulandı olarak işaretlediniz ancak Meta tarafında anlamlı bir değişim tespit edilmedi. Lütfen Meta Ads Manager üzerinden değişiklikleri kontrol edin.";
             }
             else
             {
@@ -127,5 +149,49 @@ public sealed class SuggestionImpactMeasurementService : BackgroundService
 
     private static bool AbsAtLeast(decimal? value, decimal threshold) =>
         value is not null && Math.Abs(value.Value) >= threshold;
+
+    private static (bool HasSpecificRule, bool IsMeaningful, string FailMessage) EvaluateDirectiveSpecificMeaningful(
+        string? directiveType,
+        string? message,
+        decimal? hookDelta,
+        decimal? holdDelta,
+        decimal? ctrDelta,
+        decimal? spendDelta)
+    {
+        var type = (directiveType ?? string.Empty).Trim().ToUpperInvariant();
+        var msg = (message ?? string.Empty).ToLowerInvariant();
+
+        if (type == "OPTIMIZE" && msg.Contains("hook", StringComparison.Ordinal))
+        {
+            var ok = hookDelta is not null && hookDelta.Value >= 5m;
+            return (true, ok, "Hook rate değişmedi — videoyu Meta'dan kontrol edin.");
+        }
+
+        if (type == "OPTIMIZE" && msg.Contains("hold", StringComparison.Ordinal))
+        {
+            var ok = holdDelta is not null && holdDelta.Value >= 5m;
+            return (true, ok, "Hold rate değişmedi — videoyu Meta'dan kontrol edin.");
+        }
+
+        if (type == "OPTIMIZE" && (msg.Contains("cta", StringComparison.Ordinal) || msg.Contains("tıklama", StringComparison.Ordinal)))
+        {
+            var ok = ctrDelta is not null && ctrDelta.Value >= 0.3m;
+            return (true, ok, "CTR link artmadı — CTA ve kreatifi Meta'dan kontrol edin.");
+        }
+
+        if (type == "STOP")
+        {
+            var ok = spendDelta is not null && spendDelta.Value <= -50m;
+            return (true, ok, "Harcama beklenen seviyede düşmedi — stop aksiyonunu Meta'dan kontrol edin.");
+        }
+
+        if (type == "SCALE")
+        {
+            var ok = spendDelta is not null && spendDelta.Value >= 15m;
+            return (true, ok, "Harcama beklenen seviyede artmadı — scale aksiyonunu Meta'dan kontrol edin.");
+        }
+
+        return (false, false, string.Empty);
+    }
 }
 

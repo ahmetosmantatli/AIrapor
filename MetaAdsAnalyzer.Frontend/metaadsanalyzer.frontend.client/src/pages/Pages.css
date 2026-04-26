@@ -839,6 +839,24 @@ code {
   cursor: pointer;
 }
 
+.vr-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  border-radius: 999px;
+  animation: vr-spin 0.9s linear infinite;
+}
+
+@keyframes vr-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .analyzed-list {
   display: flex;
   flex-direction: column;
@@ -1364,7 +1382,7 @@ code {
 
 .vr-timeline-points {
   position: relative;
-  height: 3rem;
+  height: 4.1rem;
 }
 
 .vr-timeline-point {
@@ -1389,6 +1407,17 @@ code {
   margin: 0;
   color: #fca5a5;
   font-size: 0.8rem;
+}
+
+.vr-drop-arrow {
+  position: relative;
+  transform: translateX(-50%);
+  top: -4.4rem;
+  width: 0;
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: help;
 }
 
 .vr-quality-banner {

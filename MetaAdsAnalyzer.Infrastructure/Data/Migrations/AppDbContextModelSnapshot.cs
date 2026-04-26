@@ -361,6 +361,11 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("AttributionWindow")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("MetaAdsetId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");

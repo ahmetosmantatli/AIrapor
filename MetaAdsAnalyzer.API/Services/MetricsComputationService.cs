@@ -122,7 +122,7 @@ public sealed class MetricsComputationService : IMetricsComputationService
         {
             var hookFallback = ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
             var thumbFallback = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s);
-            var holdFallback = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+            var holdFallback = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.VideoThruplay);
             var completionFallback = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
             var v3f = ProfitMath.VideoViewsPerSpend(raw.VideoPlay3s, raw.Spend);
             var v15f = ProfitMath.VideoViewsPerSpend(raw.Video15Sec, raw.Spend);
@@ -179,7 +179,7 @@ public sealed class MetricsComputationService : IMetricsComputationService
         var netMarginPct = ProfitMath.NetMarginPct(netPerOrder, p.SellingPrice);
         var hook = ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
         var thumb = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s);
-        var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+        var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.VideoThruplay);
         var completion = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
         var v3 = ProfitMath.VideoViewsPerSpend(raw.VideoPlay3s, raw.Spend);
         var v15 = ProfitMath.VideoViewsPerSpend(raw.Video15Sec, raw.Spend);

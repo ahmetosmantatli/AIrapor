@@ -183,7 +183,7 @@ public sealed class VideoAssetSyncService : IVideoAssetSyncService
 
                 var thumb = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s)
                             ?? ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
-                var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+                var hold = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.VideoThruplay);
                 var comp = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
 
                 if (raw.Spend > 0)

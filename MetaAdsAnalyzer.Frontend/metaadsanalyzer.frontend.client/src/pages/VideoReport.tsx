@@ -11,6 +11,7 @@ import {
   getRawInsights,
   getUserProfile,
   postDirectivesEvaluate,
+  postInsightsRefresh,
   postInsightsSync,
   postMetricsRecompute,
   postSelectActiveMetaAdAccount,
@@ -28,7 +29,7 @@ import type {
   VideoReportAggregateResponse,
 } from '../api/types'
 import { useUser } from '../context/UserContext'
-import { addAnalyzedAd, updateRecommendationStatus, type AnalyzedAdItem } from '../features/analyzedAdsStore'
+import { addAnalyzedAd, listAnalyzedAds, updateRecommendationStatus, type AnalyzedAdItem } from '../features/analyzedAdsStore'
 import './Pages.css'
 
 const PRESETS = [
@@ -51,6 +52,23 @@ type VideoGroup = {
   statusLine: string
   totalSpend: number
   cardTags: string[]
+}
+
+type CampaignAdsetBundle = {
+  adset: MetaAdsetItem
+  ads: MetaAdListItem[]
+}
+
+type AdAnalysisResult = {
+  adId: string
+  adName: string
+  adsetId: string
+  adsetName: string
+  score: number | null
+  aggregate: VideoReportAggregateResponse
+  directives: DirectiveItem[]
+  selectedGroup: VideoGroup
+  savedAnalyzedItem: AnalyzedAdItem | null
 }
 
 function buildSpendByAdId(raws: RawInsightRow[]): Map<string, number> {
@@ -156,6 +174,14 @@ function directiveTypeLabel(value: string | null | undefined): string {
   return value ?? 'İzle'
 }
 
+function scoreLetter(score: number | null | undefined): string {
+  const s = score ?? 0
+  if (s >= 80) return 'A'
+  if (s >= 60) return 'B'
+  if (s >= 40) return 'C'
+  return 'D'
+}
+
 function diagnosisText(aggregate: VideoReportAggregateResponse): string {
   const first = (aggregate.narrativeLines ?? []).find((x) => x.trim().length > 0)
   if (first) return first
@@ -226,33 +252,24 @@ export function VideoReport() {
   const [campaignsError, setCampaignsError] = useState<string | null>(null)
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
 
-  const [adsets, setAdsets] = useState<MetaAdsetItem[]>([])
   const [adsetsLoading, setAdsetsLoading] = useState(false)
   const [adsetsError, setAdsetsError] = useState<string | null>(null)
-  const [selectedAdsetId, setSelectedAdsetId] = useState<string | null>(null)
-  const [adsetSpendById, setAdsetSpendById] = useState<Map<string, number>>(new Map())
+  const [analysisByAdset, setAnalysisByAdset] = useState<AdAnalysisResult[]>([])
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisPreparedText, setAnalysisPreparedText] = useState('')
+  const [activeAnalysis, setActiveAnalysis] = useState<AdAnalysisResult | null>(null)
+  const [campaignPreparing, setCampaignPreparing] = useState(false)
+  const [campaignLastAnalyzedAt, setCampaignLastAnalyzedAt] = useState<string | null>(null)
 
-  const [ads, setAds] = useState<MetaAdListItem[]>([])
-  const [adsLoading, setAdsLoading] = useState(false)
-  const [adsError, setAdsError] = useState<string | null>(null)
-  const [rawsForSpend, setRawsForSpend] = useState<RawInsightRow[]>([])
   const [preset, setPreset] = useState('last_7d')
-  const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null)
   const [stepLog, setStepLog] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selectedGroup, setSelectedGroup] = useState<VideoGroup | null>(null)
-  const [aggregate, setAggregate] = useState<VideoReportAggregateResponse | null>(null)
-  const [mergedDirectives, setMergedDirectives] = useState<DirectiveItem[]>([])
   const [resultModalOpen, setResultModalOpen] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerStep, setPickerStep] = useState<'campaign' | 'adset' | 'ad'>('campaign')
-  const [pickerAdId, setPickerAdId] = useState<string | null>(null)
   const [appliedRecIds, setAppliedRecIds] = useState<Set<string>>(new Set())
   const [skippedRecIds, setSkippedRecIds] = useState<Set<string>>(new Set())
   const [showDataQualityBanner, setShowDataQualityBanner] = useState(true)
-  const [savedAnalyzedItem, setSavedAnalyzedItem] = useState<AnalyzedAdItem | null>(null)
   const [profitabilityModalOpen, setProfitabilityModalOpen] = useState(false)
-  const [pendingAnalyzeAdId, setPendingAnalyzeAdId] = useState<string | null>(null)
+  const [pendingCampaignAnalyze, setPendingCampaignAnalyze] = useState(false)
   const [savingProfitability, setSavingProfitability] = useState(false)
   const [salePriceInput, setSalePriceInput] = useState('')
   const [cogsInput, setCogsInput] = useState('')
@@ -260,18 +277,19 @@ export function VideoReport() {
   const [feePctInput, setFeePctInput] = useState('2.9')
   const [profitabilityErrors, setProfitabilityErrors] = useState<string[]>([])
 
-  const spendByAdId = useMemo(() => buildSpendByAdId(rawsForSpend), [rawsForSpend])
+  const aggregate = activeAnalysis?.aggregate ?? null
+  const mergedDirectives = activeAnalysis?.directives ?? []
+  const selectedGroup = activeAnalysis?.selectedGroup ?? null
+  const savedAnalyzedItem = activeAnalysis?.savedAnalyzedItem ?? null
 
   const loadCampaignsForAct = useCallback(
     async (act: string) => {
       setCampaignsLoading(true)
       setCampaignsError(null)
       setSelectedCampaignId(null)
-      setSelectedAdsetId(null)
-      setAdsets([])
       setAdsetsError(null)
-      setAds([])
-      setAdsError(null)
+      setAnalysisByAdset([])
+      setActiveAnalysis(null)
       try {
         const list = await getMetaCampaigns(userId, act)
         setCampaigns(list)
@@ -285,99 +303,42 @@ export function VideoReport() {
     [userId],
   )
 
-  const loadAdsetsForCampaign = useCallback(
-    async (act: string, campaignId: string) => {
-      setAdsetsLoading(true)
-      setAdsetsError(null)
-      setSelectedAdsetId(null)
-      setAds([])
-      setAdsError(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedCampaignId) {
+      setCampaignLastAnalyzedAt(null)
+      return
+    }
+    ;(async () => {
       try {
-        // Adset harcaması campaign/adset listelerinde gelmez; insights sync ile güncel spend doldur.
-        await postInsightsSync(userId, 'adset', preset, { metaAdAccountId: act })
-        // Adset seviyesinde 0 gelen satırları, ad seviyesinden adset_id ile türeterek güvenli fallback yap.
-        await postInsightsSync(userId, 'ad', preset, { metaAdAccountId: act })
-        const [list, rawAdsets, rawAds] = await Promise.all([
-          getMetaAdsets(userId, campaignId, act),
-          getRawInsights(userId, 'adset', { campaignId }),
-          getRawInsights(userId, 'ad', { campaignId }),
-        ])
-
-        // Her adset için son satırı alıp harcama durumunu çıkar.
-        const latest = new Map<string, RawInsightRow>()
-        for (const row of [...rawAdsets].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))) {
-          if (!latest.has(row.entityId)) latest.set(row.entityId, row)
-        }
-
-        const spendMap = new Map<string, number>()
-        for (const [id, row] of latest.entries()) {
-          spendMap.set(id, row.spend ?? 0)
-        }
-
-        // ad-level fallback: her ad için en güncel satırı alıp adset bazında topla.
-        const latestAdRows = new Map<string, RawInsightRow>()
-        for (const row of [...rawAds].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))) {
-          if (!latestAdRows.has(row.entityId)) latestAdRows.set(row.entityId, row)
-        }
-        const adsetSpendFromAds = new Map<string, number>()
-        for (const row of latestAdRows.values()) {
-          const adsetId = row.metaAdsetId?.trim()
-          if (!adsetId) continue
-          adsetSpendFromAds.set(adsetId, (adsetSpendFromAds.get(adsetId) ?? 0) + (row.spend ?? 0))
-        }
-
-        for (const adset of list) {
-          const current = spendMap.get(adset.id)
-          const fallback = adsetSpendFromAds.get(adset.id)
-          if ((current == null || current <= 0) && fallback != null && fallback > 0) {
-            spendMap.set(adset.id, fallback)
-          }
-        }
-        setAdsetSpendById(spendMap)
-
-        // Yalnızca harcamasının kesin olarak 0 olduğu adsetleri gizle.
-        // Insight satırı hiç yoksa (undefined) adseti göster; kullanıcı reklamlara inebilsin.
-        const filtered = list.filter((x) => {
-          const spend = spendMap.get(x.id)
-          return spend == null || spend > 0
-        })
-        setAdsets(filtered)
-      } catch (e: unknown) {
-        setAdsetsError(e instanceof Error ? e.message : 'Reklam setleri yüklenemedi')
-        setAdsets([])
-        setAdsetSpendById(new Map())
-      } finally {
-        setAdsetsLoading(false)
+        const rows = await listAnalyzedAds(userId)
+        if (cancelled) return
+        const latest = rows
+          .filter((x) => x.campaignId === selectedCampaignId)
+          .sort((a, b) => b.analyzedAt.localeCompare(a.analyzedAt))[0]
+        setCampaignLastAnalyzedAt(latest?.analyzedAt ?? null)
+      } catch {
+        if (!cancelled) setCampaignLastAnalyzedAt(null)
       }
-    },
-    [userId, preset],
-  )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCampaignId, userId])
 
-  const loadAdsForAdset = useCallback(
-    async (act: string, adsetId: string) => {
-      setAdsLoading(true)
-      setAdsError(null)
-      try {
-        const list = await getMetaAds(userId, act, { adsetId })
-        setAds(list)
-      } catch (e: unknown) {
-        setAdsError(e instanceof Error ? e.message : 'Reklamlar yüklenemedi')
-        setAds([])
-      } finally {
-        setAdsLoading(false)
-      }
+  const loadCampaignBundles = useCallback(
+    async (act: string, campaignId: string): Promise<CampaignAdsetBundle[]> => {
+      const adsetList = await getMetaAdsets(userId, campaignId, act)
+      const bundles = await Promise.all(
+        adsetList.map(async (adset) => {
+          const ads = await getMetaAds(userId, act, { adsetId: adset.id })
+          return { adset, ads } satisfies CampaignAdsetBundle
+        }),
+      )
+      return bundles.filter((b) => b.ads.length > 0)
     },
     [userId],
   )
-
-  const refreshSpendMap = useCallback(async () => {
-    try {
-      const raws = await getRawInsights(userId, 'ad')
-      setRawsForSpend(raws)
-    } catch {
-      setRawsForSpend([])
-    }
-  }, [userId])
 
   useEffect(() => {
     let cancelled = false
@@ -413,173 +374,28 @@ export function VideoReport() {
     }
   }, [userId, loadCampaignsForAct])
 
-  useEffect(() => {
-    if (!activeAct || ads.length === 0) {
-      setRawsForSpend([])
-      return
-    }
-    void refreshSpendMap()
-  }, [activeAct, ads.length, refreshSpendMap])
-
   async function onAccountChange(nextAct: string) {
     setError(null)
     setStepLog(null)
-    setSelectedGroup(null)
-    setAggregate(null)
-    setMergedDirectives([])
+    setActiveAnalysis(null)
+    setAnalysisByAdset([])
     setActiveAct(nextAct)
     try {
       await postSelectActiveMetaAdAccount(userId, nextAct)
       setSelectedCampaignId(null)
-      setSelectedAdsetId(null)
-      setAdsets([])
-      setAds([])
       await loadCampaignsForAct(nextAct)
     } catch (e: unknown) {
       setAccountsError(e instanceof Error ? e.message : 'Hesap seçilemedi')
     }
   }
 
-  function openPicker() {
-    if (!activeAct) return
-    setPickerOpen(true)
-    setPickerStep('campaign')
-    setPickerAdId(null)
-  }
-
-  useEffect(() => {
-    setAggregate(null)
-    setMergedDirectives([])
-    setError(null)
-    setResultModalOpen(false)
-  }, [selectedGroup?.groupKey])
-
-  useEffect(() => {
-    setSelectedGroup(null)
-    setAggregate(null)
-    setMergedDirectives([])
-    setError(null)
-    setStepLog(null)
-    setResultModalOpen(false)
-  }, [selectedCampaignId, selectedAdsetId])
-
-  async function runAnalysisForAds(group: VideoGroup, adIds: string[]) {
-    if (!activeAct || !selectedAdsetId) {
-      setError('Önce reklam seti ve reklam seçin; reklam hesabının doğru olduğundan emin olun.')
-      return
-    }
-    const videoId = group.videoId?.trim() || null
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.info('[VideoReport] Analiz gövdesi:', {
-        video_id: videoId,
-        ad_ids: adIds,
-        metaAdAccountId: activeAct,
-        preset,
-      })
-    }
-    setBusyGroupKey(group.groupKey)
-    setError(null)
-    setStepLog(null)
-    setAggregate(null)
-    setMergedDirectives([])
-    try {
-      const sync = await postInsightsSync(userId, 'ad', preset, {
-        adIds,
-        metaAdAccountId: activeAct,
-      })
-      setSelectedGroup(group)
-      setStepLog(
-        `Insights: ${sync.rowsFetched} satır çekildi, ${sync.rowsUpserted} kayıt güncellendi (${adIds.length} reklam, ad_id).`,
-      )
-      const recompute = await postMetricsRecompute(userId, { adIds })
-      setStepLog(
-        (s) =>
-          `${s} Metrik: ${recompute.computedRows} hesaplandı (yalnızca seçilen reklamlar).`,
-      )
-      const ev = await postDirectivesEvaluate(userId, { adIds })
-      setStepLog(
-        (s) =>
-          `${s} Direktif: ${ev.entitiesEvaluated} varlık, ${ev.directivesCreated} kural çıktısı.`,
-      )
-
-      const dList = await getActiveDirectives(userId)
-      const dirs = dList.filter((d) => d.entityType === 'ad' && adIds.includes(d.entityId))
-      const mergedDirs = mergeDirectives(dirs)
-      setMergedDirectives(mergedDirs)
-
-      const aggRaw = await postVideoReportAggregate({ userId, adIds, metaAdAccountId: activeAct })
-      setAggregate(sanitizeVideoAggregate(aggRaw))
-      setShowDataQualityBanner(true)
-      setResultModalOpen(true)
-      setAppliedRecIds(new Set())
-      setSkippedRecIds(new Set())
-      setSavedAnalyzedItem(null)
-      const firstAd = group.ads[0]
-      if (firstAd) {
-        const saved = await addAnalyzedAd({
-          userId,
-          adId: firstAd.id,
-          adName: firstAd.name?.trim() || firstAd.creativeName?.trim() || firstAd.id,
-          thumbnailUrl: firstAd.thumbnailUrl ?? null,
-          campaignId: selectedCampaignId,
-          campaignName: campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId,
-          adsetId: selectedAdsetId,
-          adsetName: adsets.find((x) => x.id === selectedAdsetId)?.name ?? selectedAdsetId,
-          aggregate: sanitizeVideoAggregate(aggRaw),
-          directives: mergedDirs,
-        })
-        setSavedAnalyzedItem(saved)
-      }
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.info('[VideoReport] Özet yanıtı:', {
-          hasInsightRows: aggRaw.hasInsightRows,
-          diagnosticMessage: aggRaw.diagnosticMessage,
-        })
-      }
-
-      await refreshSpendMap()
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusyGroupKey(null)
-    }
-  }
-
-  async function runPickedAdAnalysisCore(adId?: string) {
-    const targetId = adId ?? pickerAdId
-    if (!targetId) return
-    const ad = ads.find((x) => x.id === targetId)
-    if (!ad) {
-      setError('Seçilen reklam bulunamadı. Listeyi yenileyin.')
-      return
-    }
-    const adSpend = spendByAdId.get(ad.id) ?? 0
-    if (adSpend <= 0) {
-      setStepLog('Bu reklamda harcama verisi 0/bilinmiyor; analiz yine de başlatıldı.')
-    }
-    const group: VideoGroup = {
-      groupKey: `ad:${ad.id}`,
-      videoId: ad.videoId?.trim() || null,
-      ads: [ad],
-      thumbnailUrl: ad.thumbnailUrl ?? null,
-      displayName: ad.creativeName?.trim() || ad.videoTitle?.trim() || ad.name?.trim() || `Reklam ${ad.id}`,
-      statusLine: buildStatusLine([ad]),
-      totalSpend: spendByAdId.get(ad.id) ?? 0,
-      cardTags: [],
-    }
-    setPickerOpen(false)
-    await runAnalysisForAds(group, [ad.id])
-  }
-
-  async function ensureCampaignProfitabilityMapOrPrompt(targetAdId: string): Promise<boolean> {
+  async function ensureCampaignProfitabilityMapOrPrompt(): Promise<boolean> {
     if (!selectedCampaignId) return true
     try {
       const maps = await getCampaignMaps(userId)
       const hasMap = maps.some((m) => m.campaignId === selectedCampaignId)
       if (hasMap) return true
-      setPendingAnalyzeAdId(targetAdId)
+      setPendingCampaignAnalyze(true)
       setProfitabilityModalOpen(true)
       return false
     } catch {
@@ -587,12 +403,133 @@ export function VideoReport() {
     }
   }
 
-  async function runPickedAdAnalysis(adId?: string) {
-    const targetId = adId ?? pickerAdId
-    if (!targetId) return
-    const ok = await ensureCampaignProfitabilityMapOrPrompt(targetId)
+  useEffect(() => {
+    if (!campaignPreparing) {
+      setAnalysisPreparedText('')
+      return
+    }
+    const full = 'Kampanya analiziniz hazırlanıyor'
+    let i = 0
+    const tm = window.setInterval(() => {
+      i += 1
+      setAnalysisPreparedText(full.slice(0, i))
+      if (i >= full.length) window.clearInterval(tm)
+    }, 52)
+    return () => window.clearInterval(tm)
+  }, [campaignPreparing])
+
+  const runAdsetAnalysis = useCallback(
+    async (bundle: CampaignAdsetBundle, ad: MetaAdListItem): Promise<AdAnalysisResult | null> => {
+      if (!activeAct || !selectedCampaignId) return null
+      const adId = ad.id?.trim()
+      if (!adId) return null
+
+      await postInsightsSync(userId, 'ad', preset, { adIds: [adId], metaAdAccountId: activeAct })
+      await postMetricsRecompute(userId, { adIds: [adId] })
+      await postDirectivesEvaluate(userId, { adIds: [adId] })
+
+      const dList = await getActiveDirectives(userId)
+      const dirs = dList.filter((d) => d.entityType === 'ad' && d.entityId === adId)
+      const mergedDirs = mergeDirectives(dirs)
+      const aggRaw = await postVideoReportAggregate({ userId, adIds: [adId], metaAdAccountId: activeAct })
+      const aggregate = sanitizeVideoAggregate(aggRaw)
+      const firstAd = ad
+
+      let savedAnalyzedItem: AnalyzedAdItem | null = null
+      if (firstAd) {
+        savedAnalyzedItem = await addAnalyzedAd({
+          userId,
+          adId: firstAd.id,
+          adName: firstAd.name?.trim() || firstAd.creativeName?.trim() || firstAd.id,
+          thumbnailUrl: firstAd.thumbnailUrl ?? null,
+          campaignId: selectedCampaignId,
+          campaignName: campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId,
+          adsetId: bundle.adset.id,
+          adsetName: bundle.adset.name ?? bundle.adset.id,
+          aggregate,
+          directives: mergedDirs,
+        })
+      }
+
+      const selectedGroup: VideoGroup = {
+        groupKey: `ad:${adId}`,
+        videoId: firstAd?.videoId?.trim() || null,
+        ads: [firstAd],
+        thumbnailUrl: firstAd?.thumbnailUrl ?? null,
+        displayName: firstAd?.name?.trim() || firstAd?.creativeName?.trim() || adId,
+        statusLine: buildStatusLine([firstAd]),
+        totalSpend: aggregate.spend,
+        cardTags: [],
+      }
+
+      return {
+        adId,
+        adName: firstAd?.name?.trim() || firstAd?.creativeName?.trim() || adId,
+        adsetId: bundle.adset.id,
+        adsetName: bundle.adset.name?.trim() || bundle.adset.id,
+        score: aggregate.creativeScore,
+        aggregate,
+        directives: mergedDirs,
+        selectedGroup,
+        savedAnalyzedItem,
+      }
+    },
+    [activeAct, campaigns, preset, selectedCampaignId, userId],
+  )
+
+  const runCampaignAnalysisCore = useCallback(async () => {
+    if (!activeAct || !selectedCampaignId) {
+      setError('Önce reklam hesabı ve kampanya seçin.')
+      return
+    }
+    setError(null)
+    setStepLog(null)
+    setAnalysisByAdset([])
+    setActiveAnalysis(null)
+    setAnalysisLoading(true)
+    setCampaignPreparing(true)
+    try {
+      const latestRows = await getRawInsights(userId, 'ad', { limit: 1, campaignId: selectedCampaignId })
+      const latestAt = latestRows[0]?.fetchedAt ? new Date(latestRows[0].fetchedAt).getTime() : 0
+      const olderThan4h = !latestAt || Date.now() - latestAt > 4 * 60 * 60 * 1000
+      if (olderThan4h) {
+        await postInsightsRefresh(userId, activeAct)
+      }
+
+      setAdsetsLoading(true)
+      setAdsetsError(null)
+      const bundles = await loadCampaignBundles(activeAct, selectedCampaignId)
+      if (bundles.length === 0) {
+        setError('Seçilen kampanyada analiz edilecek reklam bulunamadı.')
+        return
+      }
+      const minWait = new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 25000)
+      })
+      const results: AdAnalysisResult[] = []
+      for (const bundle of bundles) {
+        for (const ad of bundle.ads) {
+          const one = await runAdsetAnalysis(bundle, ad)
+          if (one) results.push(one)
+        }
+      }
+      await minWait
+      setAnalysisByAdset(results)
+      setActiveAnalysis(results[0] ?? null)
+      setStepLog(`Kampanya analizi tamamlandı. ${results.length} reklam raporlandı.`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Kampanya analizi başarısız')
+    } finally {
+      setAdsetsLoading(false)
+      setAnalysisLoading(false)
+      setCampaignPreparing(false)
+    }
+  }, [activeAct, loadCampaignBundles, runAdsetAnalysis, selectedCampaignId, userId])
+
+  async function runCampaignAnalysis() {
+    const ok = await ensureCampaignProfitabilityMapOrPrompt()
     if (!ok) return
-    await runPickedAdAnalysisCore(targetId)
+    await runCampaignAnalysisCore()
   }
 
   function parseOptionalNumber(raw: string): number | null | 'invalid' {
@@ -663,24 +600,23 @@ export function VideoReport() {
     : []
   const biggestDrop = useMemo(() => {
     if (!aggregate) return null
+    const allZero = aggregate.videoP25 <= 0 && aggregate.videoP50 <= 0 && aggregate.videoP75 <= 0 && aggregate.videoP100 <= 0
+    if (allZero || aggregate.videoP25 <= 0) return null
     const pairs = [
-      { key: '%25→%50', prev: aggregate.videoP25, next: aggregate.videoP50 },
-      { key: '%50→%75', prev: aggregate.videoP50, next: aggregate.videoP75 },
-      { key: '%75→%100', prev: aggregate.videoP75, next: aggregate.videoP100 },
-    ].filter((x) => x.prev > 0)
-    if (pairs.length === 0) return null
-    const withDrop = pairs.map((p) => ({ ...p, dropPct: ((p.prev - p.next) / p.prev) * 100 }))
-    return withDrop.sort((a, b) => b.dropPct - a.dropPct)[0]
+      { key: '%25→%50', markerPct: 50, drop: Math.max(0, aggregate.videoP25 - aggregate.videoP50) },
+      { key: '%50→%75', markerPct: 75, drop: Math.max(0, aggregate.videoP50 - aggregate.videoP75) },
+      { key: '%75→%100', markerPct: 100, drop: Math.max(0, aggregate.videoP75 - aggregate.videoP100) },
+    ]
+    const picked = pairs.sort((a, b) => b.drop - a.drop)[0]
+    return { ...picked, leavePct: (picked.drop / aggregate.videoP25) * 100 }
   }, [aggregate])
 
   return (
     <div className="page">
       <h1 className="page-title">AI Video Rapor</h1>
       <p className="page-lead">
-        Önce <strong>reklam hesabı</strong>, ardından <strong>kampanya</strong> ve <strong>reklam seti</strong> seçin.
-        Set içindeki reklamlar aynı <strong>video_id</strong> altında gruplanır; kartı seçip{' '}
-        <strong>Bu Videoyu Analiz Et</strong> ile yalnızca o videoya ait reklamlar için insights senkronu, metrik ve
-        direktif çalışır.
+        Reklam hesabını ve kampanyayı seçin. <strong>Kampanyayı Analiz Et</strong> ile kampanyanın tüm reklam setleri
+        ve içlerindeki reklamlar otomatik analiz edilir.
       </p>
 
       <section className="panel">
@@ -698,7 +634,7 @@ export function VideoReport() {
               <select
                 value={activeAct ?? ''}
                 onChange={(e) => void onAccountChange(e.target.value)}
-                disabled={!!busyGroupKey}
+                disabled={analysisLoading}
               >
                 {linked.map((a) => (
                   <option key={a.id} value={a.metaAdAccountId}>
@@ -709,7 +645,7 @@ export function VideoReport() {
             </label>
             <label className="muted small" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
               Analiz dönemi (preset)
-              <select value={preset} onChange={(e) => setPreset(e.target.value)} disabled={!!busyGroupKey}>
+              <select value={preset} onChange={(e) => setPreset(e.target.value)} disabled={analysisLoading}>
                 {PRESETS.map((p) => (
                   <option key={p.value} value={p.value}>
                     {p.label}
@@ -720,31 +656,40 @@ export function VideoReport() {
             <div className="form-actions">
               <Button
                 type="button"
-                disabled={!activeAct || !!busyGroupKey || accountsLoading}
-                onClick={openPicker}
-              >
-                Kampanya Seç
-              </Button>
-              <Button
-                type="button"
                 variant="outline"
                 size="sm"
-                disabled={
-                  !!busyGroupKey ||
-                  !activeAct ||
-                  campaignsLoading ||
-                  (selectedAdsetId ? adsLoading : selectedCampaignId ? adsetsLoading : campaignsLoading)
-                }
+                disabled={analysisLoading || !activeAct || campaignsLoading}
                 onClick={() => {
                   if (!activeAct) return
-                  if (selectedAdsetId) void loadAdsForAdset(activeAct, selectedAdsetId)
-                  else if (selectedCampaignId) void loadAdsetsForCampaign(activeAct, selectedCampaignId)
-                  else void loadCampaignsForAct(activeAct)
+                  void loadCampaignsForAct(activeAct)
                 }}
               >
                 Listeyi yenile
               </Button>
             </div>
+            <label>
+              Kampanya
+              <select
+                value={selectedCampaignId ?? ''}
+                onChange={(e) => setSelectedCampaignId(e.target.value || null)}
+                disabled={analysisLoading || campaignsLoading}
+              >
+                <option value="">Kampanya seçin</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name?.trim() || c.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              className="primary"
+              disabled={!activeAct || !selectedCampaignId || analysisLoading}
+              onClick={() => void runCampaignAnalysis()}
+            >
+              Kampanyayı Analiz Et
+            </Button>
           </div>
         )}
       </section>
@@ -754,21 +699,86 @@ export function VideoReport() {
           <p className="muted small">
             {selectedCampaignId
               ? `Seçilen kampanya: ${campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId}`
-              : 'Kampanya seçmek için yukarıdaki "Kampanya Seç" butonunu kullanın.'}
-            {selectedAdsetId ? ` · Adset: ${adsets.find((x) => x.id === selectedAdsetId)?.name ?? selectedAdsetId}` : ''}
+              : 'Yukarıdan kampanya seçin.'}
           </p>
+          {selectedCampaignId && (
+            <p className="muted small" style={{ textAlign: 'right', marginTop: '-0.35rem' }}>
+              Son analiz tarihi:{' '}
+              <strong>
+                {campaignLastAnalyzedAt
+                  ? new Date(campaignLastAnalyzedAt).toLocaleString('tr-TR')
+                  : '—'}
+              </strong>
+            </p>
+          )}
 
-          {!selectedAdsetId && <p className="muted">Kampanya Seç → Adset Seç akışıyla reklam seçip analiz başlatın.</p>}
-          {selectedAdsetId && adsLoading && <p className="muted">Reklamlar yükleniyor…</p>}
-          {selectedAdsetId && adsError && <p className="error-banner">{adsError}</p>}
-          <h3 className="panel-title" style={{ marginTop: '0.75rem' }}>Analiz edilen reklamlar</h3>
-          <p className="muted small">
-            Bu bölüm ayrı sekmeye taşındı. Sol menüden <strong>Analiz edilen reklamlar</strong> sekmesini açın.
-          </p>
+          {adsetsLoading && <p className="muted">Kampanya içi reklam setleri hazırlanıyor…</p>}
+          {adsetsError && <p className="error-banner">{adsetsError}</p>}
+
+          {campaignPreparing && (
+            <div className="campaign-row" style={{ marginTop: '0.75rem' }}>
+              <div className="campaign-main">
+                <div className="campaign-title">{campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId}</div>
+                <div className="campaign-meta muted small">{analysisPreparedText}</div>
+              </div>
+              <div className="vr-spinner" aria-hidden="true" />
+            </div>
+          )}
+
+          {!campaignPreparing && analysisByAdset.length > 0 && (
+            <div className="campaign-list" style={{ marginTop: '0.75rem' }}>
+              <div className="campaign-row">
+                <div className="campaign-main">
+                  <div className="campaign-title">{campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId}</div>
+                  <div className="campaign-meta muted small">
+                    Kampanya analizi tamamlandı · {analysisByAdset.length} reklam analiz edildi
+                  </div>
+                </div>
+              </div>
+              {analysisByAdset.map((row) => (
+                <button
+                  type="button"
+                  key={row.adId}
+                  className={`analyzed-row ${activeAnalysis?.adId === row.adId ? 'account-card-active' : ''}`}
+                  onClick={() => {
+                    setActiveAnalysis(row)
+                    setAppliedRecIds(new Set())
+                    setSkippedRecIds(new Set())
+                    setShowDataQualityBanner(true)
+                    setResultModalOpen(true)
+                  }}
+                >
+                  <div className="analyzed-thumb-wrap">
+                    {row.selectedGroup.thumbnailUrl ? (
+                      <img src={row.selectedGroup.thumbnailUrl} alt="" className="analyzed-thumb" />
+                    ) : (
+                      <div className="analyzed-thumb-fallback" />
+                    )}
+                  </div>
+                  <div className="analyzed-main">
+                    <div className="analyzed-title">{row.adName}</div>
+                    <div className="muted small">
+                      {campaigns.find((x) => x.id === selectedCampaignId)?.name ?? selectedCampaignId} · {row.adsetName}
+                    </div>
+                    <div className="muted small">
+                      reklam {row.adId} · skor {row.score ?? '—'}/100
+                    </div>
+                    <div className="muted small analyzed-apply-badge">Raporu açmak için tıklayın</div>
+                  </div>
+                  <div className="analyzed-kpis">
+                    <div><span className="muted small">ROAS</span><strong>{numFmt(row.aggregate.roas)}x</strong></div>
+                    <div><span className="muted small">Hook</span><strong>{pctFmt(row.aggregate.thumbstopPct)}</strong></div>
+                    <div><span className="muted small">Hold</span><strong>{pctFmt(row.aggregate.holdPct)}</strong></div>
+                  </div>
+                  <div className={`grade-box ${scoreLetter(row.score) === 'A' ? 'grade-good' : scoreLetter(row.score) === 'B' ? 'grade-mid' : 'grade-bad'}`}>
+                    {scoreLetter(row.score)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
-
-      {selectedGroup && false && <section />}
 
       {error && <p className="error-banner">{error}</p>}
       {stepLog && <p className="ok-banner">{stepLog}</p>}
@@ -824,7 +834,7 @@ export function VideoReport() {
                       </span>
                       <span className="vr-priority vr-priority-mid">{directiveTypeLabel(d.directiveType)}</span>
                       <p>{d.symptom ?? d.message}</p>
-                      <p className="vr-reason">{d.reason ?? 'Neden bilgisi yok.'}</p>
+                      {d.reason ? <p className="vr-reason">{d.reason}</p> : null}
                       <p className="vr-action">{d.action ?? 'İncele ve uygun aksiyonu uygula.'}</p>
                       {(isApplied || isSkipped) && (
                         <span className={`vr-priority ${isApplied ? 'vr-priority-applied' : 'vr-priority-skipped'}`}>
@@ -938,6 +948,11 @@ export function VideoReport() {
                   )
                 })}
               </div>
+              {aggregate.purchases > 0 && aggregate.addToCart === 0 && (
+                <p className="muted small" style={{ marginTop: '0.65rem', color: '#f59e0b' }}>
+                  Satın alma verisi farklı attribution window'dan gelebilir. Sepet verisi bu pencerede görünmüyor olabilir.
+                </p>
+              )}
             </div>
 
             {isVideoAggregate && (
@@ -949,13 +964,25 @@ export function VideoReport() {
                     <div key={p.pct} className="vr-timeline-point" style={{ left: `${p.pct}%` }}>
                       <span>{p.pct}%</span>
                       <strong>{p.value.toLocaleString('tr-TR')}</strong>
+                      <em className="muted small">
+                        {aggregate.impressions > 0 ? `%${((p.value / aggregate.impressions) * 100).toFixed(1)} izledi` : '%0.0 izledi'}
+                      </em>
                     </div>
                   ))}
                 </div>
-                {biggestDrop && (
-                  <p className="vr-drop-marker">
-                    Izleyicilerin %{biggestDrop.dropPct.toFixed(1)}'i {biggestDrop.key} adımında ayrıldı.
-                  </p>
+                {biggestDrop ? (
+                  <>
+                    <div
+                      className="vr-drop-arrow"
+                      style={{ left: `${biggestDrop.markerPct}%` }}
+                      title={`En fazla izleyici kaybi burada — izleyicilerin %${biggestDrop.leavePct.toFixed(1)}'i bu noktada ayrildi`}
+                    >
+                      ↓
+                    </div>
+                    <p className="vr-drop-marker">En buyuk kayip: {biggestDrop.key}</p>
+                  </>
+                ) : (
+                  <p className="vr-drop-marker">Yeterli video izlenme verisi yok</p>
                 )}
               </div>
             )}
@@ -1039,119 +1066,6 @@ export function VideoReport() {
         </div>
       )}
 
-      {pickerOpen && (
-        <div className="vr-modal-overlay" role="dialog" aria-modal="true" aria-label="Kampanya seçim ekranı">
-          <div className="vr-modal">
-            <button type="button" className="vr-modal-close" onClick={() => setPickerOpen(false)} aria-label="Kapat">×</button>
-            <h2 className="panel-title">Kampanya seç</h2>
-            {pickerStep === 'campaign' && (
-              <div className="campaign-list">
-                {campaignsLoading && <p className="muted">Kampanyalar yükleniyor…</p>}
-                {campaignsError && <p className="error-banner">{campaignsError}</p>}
-                {campaigns.map((c) => (
-                  <button
-                    type="button"
-                    key={c.id}
-                    className="campaign-row campaign-picker-btn"
-                    onClick={() => {
-                      if (!activeAct) return
-                      setSelectedCampaignId(c.id)
-                      setSelectedAdsetId(null)
-                      setPickerAdId(null)
-                      setPickerStep('adset')
-                      void loadAdsetsForCampaign(activeAct, c.id)
-                    }}
-                  >
-                    <div className="campaign-main">
-                      <div className="campaign-title">{c.name?.trim() || c.id}</div>
-                      <div className="campaign-meta muted small">{c.objective ?? '—'} · {c.status ?? '—'}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {pickerStep === 'adset' && (
-              <div className="campaign-list">
-                <div className="form-actions" style={{ marginBottom: '0.35rem' }}>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPickerStep('campaign')}>← Kampanyalar</Button>
-                </div>
-                {adsetsLoading && <p className="muted">Reklam setleri yükleniyor…</p>}
-                {adsetsError && <p className="error-banner">{adsetsError}</p>}
-                {adsets.map((s) => (
-                  <button
-                    type="button"
-                    key={s.id}
-                    className="campaign-row campaign-picker-btn"
-                    onClick={() => {
-                      if (!activeAct) return
-                      setSelectedAdsetId(s.id)
-                      setPickerAdId(null)
-                      setPickerStep('ad')
-                      void loadAdsForAdset(activeAct, s.id)
-                    }}
-                  >
-                    <div className="campaign-main">
-                      <div className="campaign-title">{s.name?.trim() || s.id}</div>
-                      <div className="campaign-meta muted small">
-                        {s.status ?? '—'} · campaign {s.campaignId ?? '—'} · harcama{' '}
-                        {adsetSpendById.has(s.id) ? (adsetSpendById.get(s.id) ?? 0).toFixed(2) : 'bilinmiyor'}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {pickerStep === 'ad' && (
-              <div className="campaign-list">
-                <div className="form-actions" style={{ marginBottom: '0.35rem' }}>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPickerStep('adset')}>← Adsetler</Button>
-                </div>
-                {adsLoading && <p className="muted">Reklamlar yükleniyor…</p>}
-                {adsError && <p className="error-banner">{adsError}</p>}
-                {ads.map((a) => {
-                  const adSpend = spendByAdId.get(a.id) ?? 0
-                  return (
-                  <div
-                    key={a.id}
-                    className={`campaign-row ${pickerAdId === a.id ? 'account-card-active' : ''}`}
-                    onClick={() => setPickerAdId(a.id)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
-                      <div style={{ width: '70px', height: '70px', borderRadius: '8px', overflow: 'hidden', background: 'hsl(var(--muted))' }}>
-                        {a.thumbnailUrl ? (
-                          <img src={a.thumbnailUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ width: '100%', height: '100%' }} />
-                        )}
-                      </div>
-                      <div className="campaign-main">
-                        <div className="campaign-title">{a.name?.trim() || a.creativeName?.trim() || a.id}</div>
-                        <div className="campaign-meta muted small">
-                          reklam {a.id} · video_id {a.videoId?.trim() || '—'} · harcama {adSpend.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="form-actions" style={{ justifyContent: 'flex-end' }}>
-                      <button type="button" className="btn">Atla</button>
-                      <button
-                        type="button"
-                        className="btn primary"
-                        disabled={!!busyGroupKey}
-                        title={adSpend <= 0 ? 'Harcama verisi 0/bilinmiyor; analiz yapılabilir.' : undefined}
-                        onClick={() => void runPickedAdAnalysis(a.id)}
-                      >
-                        Uygula
-                      </button>
-                    </div>
-                  </div>
-                )})}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
       {profitabilityModalOpen && (
         <div className="vr-modal-overlay" role="dialog" aria-modal="true" aria-label="Karlılık analizi ekle">
           <div className="vr-modal" style={{ maxWidth: '680px' }}>
@@ -1160,7 +1074,7 @@ export function VideoReport() {
               className="vr-modal-close"
               onClick={() => {
                 setProfitabilityModalOpen(false)
-                setPendingAnalyzeAdId(null)
+                setPendingCampaignAnalyze(false)
                 setProfitabilityErrors([])
               }}
               aria-label="Kapat"
@@ -1200,11 +1114,10 @@ export function VideoReport() {
                 className="btn"
                 disabled={savingProfitability}
                 onClick={() => {
-                  const adId = pendingAnalyzeAdId
                   setProfitabilityModalOpen(false)
-                  setPendingAnalyzeAdId(null)
+                  setPendingCampaignAnalyze(false)
                   setProfitabilityErrors([])
-                  if (adId) void runPickedAdAnalysisCore(adId)
+                  if (pendingCampaignAnalyze) void runCampaignAnalysisCore()
                 }}
               >
                 Atla
@@ -1212,10 +1125,10 @@ export function VideoReport() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={savingProfitability || !pendingAnalyzeAdId || !selectedCampaignId}
+                disabled={savingProfitability || !pendingCampaignAnalyze || !selectedCampaignId}
                 onClick={() => {
                   void (async () => {
-                    if (!pendingAnalyzeAdId || !selectedCampaignId) return
+                    if (!pendingCampaignAnalyze || !selectedCampaignId) return
                     setSavingProfitability(true)
                     setError(null)
                     try {
@@ -1250,10 +1163,9 @@ export function VideoReport() {
                         productId: product.id,
                       })
                       setProfitabilityModalOpen(false)
-                      const adId = pendingAnalyzeAdId
-                      setPendingAnalyzeAdId(null)
+                      setPendingCampaignAnalyze(false)
                       setProfitabilityErrors([])
-                      await runPickedAdAnalysisCore(adId)
+                      await runCampaignAnalysisCore()
                     } catch (e: unknown) {
                       setError(e instanceof Error ? e.message : 'Karlılık bilgisi kaydedilemedi')
                     } finally {

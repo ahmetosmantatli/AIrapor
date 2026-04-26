@@ -12,6 +12,9 @@ namespace MetaAdsAnalyzer.API.Services;
 public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
 {
     private const int PageLimit = 250;
+    private static readonly TimeSpan DefaultCacheWindow = TimeSpan.FromHours(4);
+    private const string FixedAttributionWindow = "7d_click_1d_view";
+    private const string GraphAttributionWindowsParam = "['7d_click','1d_view']";
 
     /// <summary>
     /// Yalnızca Graph Ads Insights’te geçerli üst-seviye alanlar.
@@ -138,6 +141,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         string? adId = null,
         string? metaAdAccountId = null,
         IReadOnlyList<string>? adIds = null,
+        bool force = false,
         CancellationToken cancellationToken = default)
     {
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
@@ -204,6 +208,15 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         }
 
         var actId = await ResolveActIdForUserAsync(userId, metaAdAccountId, cancellationToken).ConfigureAwait(false);
+        if (!force)
+        {
+            var cacheHit = await HasFreshInsightsAsync(userId, actId, level, merged, cancellationToken).ConfigureAwait(false);
+            if (cacheHit)
+            {
+                return new InsightsSyncResponseDto();
+            }
+        }
+
         var version = string.IsNullOrWhiteSpace(_options.ApiVersion) ? "v19.0" : _options.ApiVersion.Trim().TrimStart('/');
         var firstUrl = BuildInsightsFirstUrl(actId, accessToken, version, level, datePreset, filteringJson);
 
@@ -283,6 +296,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             $"&fields={Uri.EscapeDataString(fields)}" +
             $"&level={Uri.EscapeDataString(level)}" +
             $"&date_preset={Uri.EscapeDataString(datePreset)}" +
+            $"&action_attribution_windows={Uri.EscapeDataString(GraphAttributionWindowsParam)}" +
             $"&limit={PageLimit}";
         if (!string.IsNullOrEmpty(filteringJson))
         {
@@ -844,6 +858,29 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         return act;
     }
 
+    private async Task<bool> HasFreshInsightsAsync(
+        int userId,
+        string metaAdAccountId,
+        string level,
+        IReadOnlyList<string> adIds,
+        CancellationToken cancellationToken)
+    {
+        var since = DateTimeOffset.UtcNow - DefaultCacheWindow;
+        var query = _db.RawInsights.AsNoTracking()
+            .Where(x =>
+                x.UserId == userId &&
+                x.MetaAdAccountId == metaAdAccountId &&
+                x.Level == level &&
+                x.FetchedAt >= since);
+
+        if (adIds.Count > 0)
+        {
+            query = query.Where(x => adIds.Contains(x.EntityId));
+        }
+
+        return await query.AnyAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private string RequirePlainAccessToken(User user)
     {
         if (string.IsNullOrWhiteSpace(user.MetaAccessToken))
@@ -909,6 +946,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             EntityName = string.IsNullOrWhiteSpace(entityName) ? null : entityName,
             MetaCampaignId = string.IsNullOrWhiteSpace(metaCampaignId) ? null : metaCampaignId,
             MetaAdsetId = string.IsNullOrWhiteSpace(metaAdsetId) ? null : metaAdsetId,
+            AttributionWindow = FixedAttributionWindow,
             DateStart = dateStart,
             DateStop = dateStop,
             Spend = ParseDecimal(row, "spend"),
@@ -946,6 +984,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         target.MetaCampaignId = source.MetaCampaignId;
         target.MetaAdsetId = source.MetaAdsetId;
         target.MetaAdAccountId = source.MetaAdAccountId;
+        target.AttributionWindow = source.AttributionWindow;
         target.Spend = source.Spend;
         target.Impressions = source.Impressions;
         target.Reach = source.Reach;

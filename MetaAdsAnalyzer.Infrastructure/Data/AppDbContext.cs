@@ -37,6 +37,8 @@ public class AppDbContext : DbContext
 
     public DbSet<SavedReportSuggestion> SavedReportSuggestions => Set<SavedReportSuggestion>();
 
+    public DbSet<UserSyncLog> UserSyncLogs => Set<UserSyncLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

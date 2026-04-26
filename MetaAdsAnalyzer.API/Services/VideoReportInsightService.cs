@@ -174,7 +174,7 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
 
             var thumb = ProfitMath.ThumbstopRatePct(raw.Reach, raw.VideoPlay3s)
                         ?? ProfitMath.HookRatePct(raw.Impressions, raw.VideoPlay3s);
-            var holdPctAd = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.Video15Sec);
+            var holdPctAd = ProfitMath.HoldRatePct(raw.VideoPlay3s, raw.VideoThruplay);
             var comp = ProfitMath.CompletionRatePct(raw.Impressions, raw.VideoP100);
 
             if (raw.Spend > 0)

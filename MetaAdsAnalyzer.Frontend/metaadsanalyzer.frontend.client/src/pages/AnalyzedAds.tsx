@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listAnalyzedAds, type AnalyzedAdItem, updateRecommendationStatus } from '../features/analyzedAdsStore'
-import { getRawInsights } from '../api/client'
-import type { RawInsightRow } from '../api/types'
+import { getLinkedMetaAdAccounts, getMetaCampaigns, getRawInsights, getUserProfile } from '../api/client'
+import type { LinkedMetaAdAccountItem, MetaCampaignItem, RawInsightRow } from '../api/types'
 import { useUser } from '../context/UserContext'
 import './Pages.css'
 
@@ -91,6 +91,13 @@ export function AnalyzedAds() {
   const [detailTab, setDetailTab] = useState<DetailTab>('funnel')
   const [listTab, setListTab] = useState<'pending' | 'completed'>('pending')
   const [activeRawLatest, setActiveRawLatest] = useState<RawInsightRow | null>(null)
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedMetaAdAccountItem[]>([])
+  const [activeAccountId, setActiveAccountId] = useState<string>('')
+  const [campaigns, setCampaigns] = useState<MetaCampaignItem[]>([])
+  const [campaignsLoading, setCampaignsLoading] = useState(false)
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
+  const [campaignError, setCampaignError] = useState<string | null>(null)
+  const [campaignEmptyMessage, setCampaignEmptyMessage] = useState('')
 
   const rows = useMemo(() => items, [items])
   const pendingRows = useMemo(
@@ -101,7 +108,35 @@ export function AnalyzedAds() {
     () => rows.filter((x) => x.recommendations.some((r) => r.status === 'applied')),
     [rows],
   )
-  const visibleRows = listTab === 'pending' ? pendingRows : completedRows
+  const campaignPendingCount = useMemo(() => {
+    if (!selectedCampaignId) return pendingRows.length
+    return pendingRows.filter((x) => x.campaignId === selectedCampaignId).length
+  }, [pendingRows, selectedCampaignId])
+  const campaignCompletedCount = useMemo(() => {
+    if (!selectedCampaignId) return completedRows.length
+    return completedRows.filter((x) => x.campaignId === selectedCampaignId).length
+  }, [completedRows, selectedCampaignId])
+  const selectedRows = listTab === 'pending' ? pendingRows : completedRows
+  const fallbackCampaigns = useMemo<MetaCampaignItem[]>(() => {
+    const map = new Map<string, MetaCampaignItem>()
+    for (const row of rows) {
+      const id = row.campaignId?.trim()
+      if (!id) continue
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          name: row.campaignName?.trim() || id,
+          status: null,
+          objective: null,
+        })
+      }
+    }
+    return [...map.values()]
+  }, [rows])
+  const visibleRows = useMemo(() => {
+    if (!selectedCampaignId) return selectedRows
+    return selectedRows.filter((x) => x.campaignId === selectedCampaignId)
+  }, [selectedCampaignId, selectedRows])
 
   useEffect(() => {
     const adId = searchParams.get('adId')
@@ -117,6 +152,88 @@ export function AnalyzedAds() {
   useEffect(() => {
     refresh()
   }, [userId])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [profile, linked] = await Promise.all([
+          getUserProfile(userId),
+          getLinkedMetaAdAccounts(userId),
+        ])
+        if (cancelled) return
+        setLinkedAccounts(linked)
+        const preferred =
+          profile.metaAdAccountId &&
+          linked.some((l) => l.metaAdAccountId === profile.metaAdAccountId)
+            ? profile.metaAdAccountId
+            : linked[0]?.metaAdAccountId ?? ''
+        setActiveAccountId(preferred)
+      } catch {
+        if (!cancelled) {
+          setLinkedAccounts([])
+          setActiveAccountId('')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!activeAccountId) {
+      setCampaigns(fallbackCampaigns)
+      setSelectedCampaignId('')
+      return
+    }
+    ;(async () => {
+      setCampaignsLoading(true)
+      setCampaignError(null)
+      try {
+        const list = await getMetaCampaigns(userId, activeAccountId)
+        if (cancelled) return
+        const resolved = list.length > 0 ? list : fallbackCampaigns
+        setCampaigns(resolved)
+        setSelectedCampaignId((prev) =>
+          prev && resolved.some((c) => c.id === prev) ? prev : '',
+        )
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setCampaigns(fallbackCampaigns)
+          setSelectedCampaignId('')
+          setCampaignError(
+            e instanceof Error
+              ? `${e.message} (Meta geçici erişilemiyor, analiz geçmişindeki kampanyalar gösterildi)`
+              : 'Kampanyalar Meta’dan yüklenemedi; analiz geçmişindeki kampanyalar gösterildi',
+          )
+        }
+      } finally {
+        if (!cancelled) setCampaignsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeAccountId, fallbackCampaigns, userId])
+
+  useEffect(() => {
+    if (!selectedCampaignId || visibleRows.length > 0 || campaignsLoading) {
+      setCampaignEmptyMessage('')
+      return
+    }
+    const full = 'Bu kampanya için analiz yapmadınız.'
+    let i = 0
+    const timer = window.setInterval(() => {
+      i += 1
+      setCampaignEmptyMessage(full.slice(0, i))
+      if (i >= full.length) {
+        window.clearInterval(timer)
+      }
+    }, 45)
+    return () => window.clearInterval(timer)
+  }, [campaignsLoading, selectedCampaignId, visibleRows.length])
 
   useEffect(() => {
     let cancelled = false
@@ -165,20 +282,58 @@ export function AnalyzedAds() {
       <p className="page-lead">Tüm analiz geçmişini burada takip edin. Karta tıklayarak detay raporu açabilirsiniz.</p>
       {rows.length === 0 && <p className="muted">Henüz analiz edilmiş reklam yok.</p>}
 
+      <section className="panel" style={{ marginBottom: '0.8rem' }}>
+        <div className="form-stack" style={{ maxWidth: '28rem' }}>
+          <label>
+            Reklam hesabı
+            <select
+              value={activeAccountId}
+              onChange={(e) => setActiveAccountId(e.target.value)}
+            >
+              <option value="">Reklam hesabı seçin</option>
+              {linkedAccounts.map((a) => (
+                <option key={a.id} value={a.metaAdAccountId}>
+                  {a.displayName?.trim() || a.metaAdAccountId}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Kampanya
+            <select
+              value={selectedCampaignId}
+              onChange={(e) => setSelectedCampaignId(e.target.value)}
+              disabled={!activeAccountId || campaignsLoading}
+            >
+              <option value="">Tüm kampanyalar</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name?.trim() || c.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          {campaignError && <p className="error-banner">{campaignError}</p>}
+          {selectedCampaignId && visibleRows.length === 0 && campaignEmptyMessage && (
+            <p className="muted small">{campaignEmptyMessage}</p>
+          )}
+        </div>
+      </section>
+
       <div className="analyzed-tabs" style={{ marginTop: '0.8rem', marginBottom: '0.55rem' }}>
         <button
           type="button"
           className={`btn ${listTab === 'pending' ? 'primary' : ''}`}
           onClick={() => setListTab('pending')}
         >
-          Bekleyen aksiyonlar ({pendingRows.length})
+          Bekleyen aksiyonlar ({campaignPendingCount})
         </button>
         <button
           type="button"
           className={`btn ${listTab === 'completed' ? 'primary' : ''}`}
           onClick={() => setListTab('completed')}
         >
-          Tamamlanmış analizler ({completedRows.length})
+          Tamamlanmış analizler ({campaignCompletedCount})
         </button>
       </div>
       <p className="muted small" style={{ marginBottom: '0.6rem' }}>
@@ -242,7 +397,7 @@ export function AnalyzedAds() {
             </button>
           )
         })}
-        {visibleRows.length === 0 && (
+        {visibleRows.length === 0 && !selectedCampaignId && (
           <p className="muted">
             {listTab === 'pending' ? 'Bekleyen aksiyon yok.' : 'Henüz tamamlanmış analiz yok.'}
           </p>

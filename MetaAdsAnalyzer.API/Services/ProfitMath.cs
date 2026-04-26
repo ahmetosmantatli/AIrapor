@@ -106,15 +106,15 @@ public static class ProfitMath
         return (decimal)videoPlay3s / reach * 100m;
     }
 
-    /// <summary>15 sn / 3 sn ×100 (hold).</summary>
-    public static decimal? HoldRatePct(long videoPlay3s, long video15Sec)
+    /// <summary>Thruplay / 3 sn izlenme ×100 (hold).</summary>
+    public static decimal? HoldRatePct(long videoPlay3s, long videoThruplay)
     {
         if (videoPlay3s <= 0)
         {
             return null;
         }
 
-        return (decimal)video15Sec / videoPlay3s * 100m;
+        return (decimal)videoThruplay / videoPlay3s * 100m;
     }
 
     public static decimal? CompletionRatePct(long impressions, long videoP100)
