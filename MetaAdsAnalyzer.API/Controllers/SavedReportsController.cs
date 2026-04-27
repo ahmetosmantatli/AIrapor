@@ -158,7 +158,6 @@ public class SavedReportsController : ControllerBase
         {
             Id = report.Id,
             AdId = report.AdId,
-            AdName = body.AdName?.Trim(),
             AdName = report.AdName,
             ThumbnailUrl = report.ThumbnailUrl,
             CampaignId = report.CampaignId,
