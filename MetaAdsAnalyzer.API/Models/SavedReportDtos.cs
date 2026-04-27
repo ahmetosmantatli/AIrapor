@@ -80,7 +80,7 @@ public sealed class SavedReportSuggestionDto
     public string? MetaChangeMessage { get; set; }
 }
 
-public sealed class SavedReportImpactFeedItemDto
+public class SavedReportImpactFeedItemDto
 {
     public int SuggestionId { get; set; }
     public int SavedReportId { get; set; }
