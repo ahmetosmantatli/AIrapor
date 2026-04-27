@@ -305,10 +305,32 @@ export type SavedReportImpactFeedItem = {
   savedReportId: number
   adId: string
   adName: string | null
+  campaignId: string | null
+  campaignName: string | null
+  adsetId: string | null
+  adsetName: string | null
   appliedAt: string
   impactMeasuredAt: string | null
   beforeRoas: number | null
   afterRoas: number | null
+  beforeSpend: number | null
+  afterSpend: number | null
+  beforePurchases: number | null
+  afterPurchases: number | null
+  beforeHookRate: number | null
+  afterHookRate: number | null
+  beforeHoldRate: number | null
+  afterHoldRate: number | null
+  directiveType: string | null
+  severity: string | null
+  message: string | null
+  symptom: string | null
+  reason: string | null
+  action: string | null
   metaChangeDetected: boolean
   metaChangeMessage: string | null
+}
+
+export type SavedReportImpactDetail = SavedReportImpactFeedItem & {
+  analyzedAt: string
 }

@@ -16,13 +16,19 @@ public class MetaInsightsController : ControllerBase
     private readonly IMetaInsightsSyncService _insights;
     private readonly IVideoAssetSyncService _videoAssets;
     private readonly AppDbContext _db;
+    private readonly ILogger<MetaInsightsController> _logger;
     private const int DailyManualSyncLimit = 10;
 
-    public MetaInsightsController(IMetaInsightsSyncService insights, IVideoAssetSyncService videoAssets, AppDbContext db)
+    public MetaInsightsController(
+        IMetaInsightsSyncService insights,
+        IVideoAssetSyncService videoAssets,
+        AppDbContext db,
+        ILogger<MetaInsightsController> logger)
     {
         _insights = insights;
         _videoAssets = videoAssets;
         _db = db;
+        _logger = logger;
     }
 
     /// <summary>
@@ -109,10 +115,22 @@ public class MetaInsightsController : ControllerBase
         try
         {
             var actId = string.IsNullOrWhiteSpace(body.MetaAdAccountId) ? null : body.MetaAdAccountId.Trim();
+            _logger.LogInformation(
+                "Insights refresh request received UserId={UserId} ActId={ActId}",
+                body.UserId,
+                actId ?? "(default)");
+
             var lastSync = await GetLastSyncAsync(body.UserId, actId, cancellationToken).ConfigureAwait(false);
             if (lastSync is not null && DateTimeOffset.UtcNow - lastSync.Value < TimeSpan.FromHours(1))
             {
                 var mins = Math.Max(1, (int)Math.Round((DateTimeOffset.UtcNow - lastSync.Value).TotalMinutes));
+                _logger.LogInformation(
+                    "Insights refresh skipped by cooldown UserId={UserId} ActId={ActId} LastSync={LastSync} MinutesAgo={MinutesAgo}",
+                    body.UserId,
+                    actId ?? "(default)",
+                    lastSync,
+                    mins);
+
                 return Ok(
                     new InsightsRefreshResponseDto
                     {
@@ -128,6 +146,12 @@ public class MetaInsightsController : ControllerBase
                 .ConfigureAwait(false);
             if (log is not null && log.SyncCount >= DailyManualSyncLimit)
             {
+                _logger.LogWarning(
+                    "Insights refresh blocked by daily limit UserId={UserId} ActId={ActId} DailyCount={DailyCount}",
+                    body.UserId,
+                    actId ?? "(default)",
+                    log.SyncCount);
+
                 return Ok(
                     new InsightsRefreshResponseDto
                     {
@@ -137,6 +161,11 @@ public class MetaInsightsController : ControllerBase
                         DailyCount = log.SyncCount,
                     });
             }
+
+            _logger.LogInformation(
+                "Insights refresh started sync pipelines UserId={UserId} ActId={ActId}",
+                body.UserId,
+                actId ?? "(default)");
 
             await _insights.SyncInsightsAsync(body.UserId, "campaign", "last_30d", null, actId, null, true, cancellationToken)
                 .ConfigureAwait(false);
@@ -162,6 +191,13 @@ public class MetaInsightsController : ControllerBase
             await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             var refreshedAt = await GetLastSyncAsync(body.UserId, actId, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation(
+                "Insights refresh completed UserId={UserId} ActId={ActId} LastSync={LastSync} DailyCount={DailyCount}",
+                body.UserId,
+                actId ?? "(default)",
+                refreshedAt,
+                log.SyncCount);
+
             return Ok(
                 new InsightsRefreshResponseDto
                 {

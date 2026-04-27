@@ -289,6 +289,18 @@ public sealed class VideoReportInsightService : IVideoReportInsightService
             linkClicks);
 
         _logger.LogInformation(
+            "VIDEO_TIMELINE_METRICS UserId={UserId} Act={Act} AdCount={AdCount} Play3s={Play3s} ThruPlay={ThruPlay} P25={P25} P50={P50} P75={P75} P100={P100}",
+            userId,
+            act,
+            latestByAd.Count,
+            videoPlay3s,
+            thruPlay,
+            videoP25,
+            videoP50,
+            videoP75,
+            videoP100);
+
+        _logger.LogInformation(
             "VideoReport aggregate OK UserId={UserId} Act={Act} Reklam={AdCount}",
             userId,
             act,

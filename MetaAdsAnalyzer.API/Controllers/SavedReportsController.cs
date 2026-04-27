@@ -26,8 +26,13 @@ public class SavedReportsController : ControllerBase
         var auth = this.EnsureOwnUser(userId);
         if (auth is not null) return auth;
 
-        var list = await _db.SavedReports.AsNoTracking()
+        var latestIds = _db.SavedReports.AsNoTracking()
             .Where(x => x.UserId == userId)
+            .GroupBy(x => x.AdId)
+            .Select(g => g.OrderByDescending(x => x.AnalyzedAt).ThenByDescending(x => x.Id).Select(x => x.Id).First());
+
+        var list = await _db.SavedReports.AsNoTracking()
+            .Where(x => latestIds.Contains(x.Id))
             .OrderByDescending(x => x.AnalyzedAt)
             .Select(x => new SavedReportListItemDto
             {
@@ -84,23 +89,47 @@ public class SavedReportsController : ControllerBase
         var auth = this.EnsureOwnUser(body.UserId);
         if (auth is not null) return auth;
 
-        var report = new Core.Entities.SavedReport
+        var adId = body.AdId.Trim();
+        var existingForAd = await _db.SavedReports
+            .Include(x => x.Suggestions)
+            .Where(x => x.UserId == body.UserId && x.AdId == adId)
+            .OrderByDescending(x => x.AnalyzedAt)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync(ct);
+
+        var reusable = existingForAd.FirstOrDefault(x => x.Suggestions.All(s => s.AppliedAt == null));
+        var report = reusable ?? new Core.Entities.SavedReport
         {
             UserId = body.UserId,
-            AdId = body.AdId.Trim(),
-            AdName = body.AdName?.Trim(),
-            ThumbnailUrl = body.ThumbnailUrl?.Trim(),
-            CampaignId = body.CampaignId?.Trim(),
-            CampaignName = body.CampaignName?.Trim(),
-            AdsetId = body.AdsetId?.Trim(),
-            AdsetName = body.AdsetName?.Trim(),
-            AggregateRoas = body.AggregateRoas,
-            AggregateHookRate = body.AggregateHookRate,
-            AggregateHoldRate = body.AggregateHoldRate,
-            AggregateSpend = body.AggregateSpend,
-            AggregatePurchases = body.AggregatePurchases,
-            AnalyzedAt = DateTimeOffset.UtcNow,
+            AdId = adId,
         };
+
+        report.AdName = body.AdName?.Trim();
+        report.ThumbnailUrl = body.ThumbnailUrl?.Trim();
+        report.CampaignId = body.CampaignId?.Trim();
+        report.CampaignName = body.CampaignName?.Trim();
+        report.AdsetId = body.AdsetId?.Trim();
+        report.AdsetName = body.AdsetName?.Trim();
+        report.AggregateRoas = body.AggregateRoas;
+        report.AggregateHookRate = body.AggregateHookRate;
+        report.AggregateHoldRate = body.AggregateHoldRate;
+        report.AggregateSpend = body.AggregateSpend;
+        report.AggregatePurchases = body.AggregatePurchases;
+        report.AnalyzedAt = DateTimeOffset.UtcNow;
+
+        if (reusable is null)
+        {
+            _db.SavedReports.Add(report);
+        }
+        else
+        {
+            if (reusable.Suggestions.Count > 0)
+            {
+                _db.SavedReportSuggestions.RemoveRange(reusable.Suggestions);
+            }
+            reusable.Suggestions = new List<Core.Entities.SavedReportSuggestion>();
+        }
+
         report.Suggestions = body.Suggestions
             .Where(s => !string.IsNullOrWhiteSpace(s.SuggestionKey))
             .Select(s => new Core.Entities.SavedReportSuggestion
@@ -114,13 +143,22 @@ public class SavedReportsController : ControllerBase
                 Action = s.Action?.Trim(),
             }).ToList();
 
-        _db.SavedReports.Add(report);
+        // Keep immutable snapshots only for applied-tracking history, drop stale non-applied duplicates.
+        var removable = existingForAd
+            .Where(x => x.Id != report.Id && x.Suggestions.All(s => s.AppliedAt == null))
+            .ToList();
+        if (removable.Count > 0)
+        {
+            _db.SavedReports.RemoveRange(removable);
+        }
+
         await _db.SaveChangesAsync(ct);
 
         return Ok(new SavedReportListItemDto
         {
             Id = report.Id,
             AdId = report.AdId,
+            AdName = body.AdName?.Trim(),
             AdName = report.AdName,
             ThumbnailUrl = report.ThumbnailUrl,
             CampaignId = report.CampaignId,
@@ -236,16 +274,85 @@ public class SavedReportsController : ControllerBase
                 SavedReportId = s.SavedReportId,
                 AdId = s.SavedReport.AdId,
                 AdName = s.SavedReport.AdName,
+                CampaignId = s.SavedReport.CampaignId,
+                CampaignName = s.SavedReport.CampaignName,
+                AdsetId = s.SavedReport.AdsetId,
+                AdsetName = s.SavedReport.AdsetName,
                 AppliedAt = s.AppliedAt!.Value,
                 ImpactMeasuredAt = s.ImpactMeasuredAt,
                 BeforeRoas = s.BeforeRoas,
                 AfterRoas = s.AfterRoas,
+                BeforeSpend = s.BeforeSpend,
+                AfterSpend = s.AfterSpend,
+                BeforePurchases = s.BeforePurchases,
+                AfterPurchases = s.AfterPurchases,
+                BeforeHookRate = s.BeforeHookRate,
+                AfterHookRate = s.AfterHookRate,
+                BeforeHoldRate = s.BeforeHoldRate,
+                AfterHoldRate = s.AfterHoldRate,
+                DirectiveType = s.DirectiveType,
+                Severity = s.Severity,
+                Message = s.Message,
+                Symptom = s.Symptom,
+                Reason = s.Reason,
+                Action = s.Action,
                 MetaChangeDetected = s.MetaChangeDetected,
                 MetaChangeMessage = s.MetaChangeMessage,
             })
             .ToListAsync(ct);
 
         return Ok(list);
+    }
+
+    [HttpGet("impacts/suggestions/{suggestionId:int}")]
+    public async Task<ActionResult<SavedReportImpactDetailDto>> ImpactDetailBySuggestion(
+        int suggestionId,
+        CancellationToken ct = default)
+    {
+        if (suggestionId <= 0) return BadRequest();
+        var hit = await _db.SavedReportSuggestions.AsNoTracking()
+            .Where(s => s.Id == suggestionId && s.AppliedAt != null)
+            .Select(s => new
+            {
+                s.SavedReport.UserId,
+                Detail = new SavedReportImpactDetailDto
+                {
+                    SuggestionId = s.Id,
+                    SavedReportId = s.SavedReportId,
+                    AdId = s.SavedReport.AdId,
+                    AdName = s.SavedReport.AdName,
+                    CampaignId = s.SavedReport.CampaignId,
+                    CampaignName = s.SavedReport.CampaignName,
+                    AdsetId = s.SavedReport.AdsetId,
+                    AdsetName = s.SavedReport.AdsetName,
+                    AppliedAt = s.AppliedAt!.Value,
+                    AnalyzedAt = s.SavedReport.AnalyzedAt,
+                    ImpactMeasuredAt = s.ImpactMeasuredAt,
+                    BeforeRoas = s.BeforeRoas,
+                    AfterRoas = s.AfterRoas,
+                    BeforeSpend = s.BeforeSpend,
+                    AfterSpend = s.AfterSpend,
+                    BeforePurchases = s.BeforePurchases,
+                    AfterPurchases = s.AfterPurchases,
+                    BeforeHookRate = s.BeforeHookRate,
+                    AfterHookRate = s.AfterHookRate,
+                    BeforeHoldRate = s.BeforeHoldRate,
+                    AfterHoldRate = s.AfterHoldRate,
+                    DirectiveType = s.DirectiveType,
+                    Severity = s.Severity,
+                    Message = s.Message,
+                    Symptom = s.Symptom,
+                    Reason = s.Reason,
+                    Action = s.Action,
+                    MetaChangeDetected = s.MetaChangeDetected,
+                    MetaChangeMessage = s.MetaChangeMessage,
+                },
+            })
+            .FirstOrDefaultAsync(ct);
+        if (hit is null) return NotFound();
+        var auth = this.EnsureOwnUser(hit.UserId);
+        if (auth is not null) return auth;
+        return Ok(hit.Detail);
     }
 
     private async Task FillBeforeMetricsAsync(Core.Entities.SavedReportSuggestion suggestion, CancellationToken ct)

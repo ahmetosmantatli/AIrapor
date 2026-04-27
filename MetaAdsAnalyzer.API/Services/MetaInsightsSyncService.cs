@@ -17,9 +17,8 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
     private const string GraphAttributionWindowsParam = "['7d_click','1d_view']";
 
     /// <summary>
-    /// Yalnızca Graph Ads Insights’te geçerli üst-seviye alanlar.
-    /// <c>video_*_watched_actions</c> üst seviye alanlar çoğu hesapta reddedilir; ek video metrikleri <see cref="MapRow"/> içinde
-    /// <c>video_play_actions</c> ve <c>actions</c> dizisinden türetilir.
+    /// Graph Ads Insights üst-seviye alanlar listesi.
+    /// Video watched alanları bazı hesaplarda üst-seviye response alanı olarak döner.
     /// </summary>
     private static readonly string[] InsightsFieldList =
     {
@@ -32,6 +31,11 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         "ctr", "inline_link_click_ctr", "cpm", "cost_per_inline_link_click",
         "actions", "action_values",
         "video_play_actions",
+        "video_thruplay_watched_actions",
+        "video_p25_watched_actions",
+        "video_p50_watched_actions",
+        "video_p75_watched_actions",
+        "video_p100_watched_actions",
     };
 
     private static readonly HashSet<string> PurchaseActionTypes = new(StringComparer.Ordinal)
@@ -219,6 +223,13 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
 
         var version = string.IsNullOrWhiteSpace(_options.ApiVersion) ? "v19.0" : _options.ApiVersion.Trim().TrimStart('/');
         var firstUrl = BuildInsightsFirstUrl(actId, accessToken, version, level, datePreset, filteringJson);
+        _logger.LogInformation(
+            "META_REQUEST level={Level} preset={Preset} actId={ActId} fields={Fields} url={Url}",
+            level,
+            datePreset,
+            actId,
+            string.Join(",", InsightsFieldList),
+            firstUrl);
 
         return await FetchAndUpsertInsightPagesAsync(firstUrl, userId, level, actId, cancellationToken)
             .ConfigureAwait(false);
@@ -290,6 +301,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         string? filteringJson)
     {
         var fields = string.Join(",", InsightsFieldList);
+        const string actionBreakdowns = "action_type";
         var url =
             $"https://graph.facebook.com/{version}/{actId}/insights" +
             $"?access_token={Uri.EscapeDataString(accessToken)}" +
@@ -297,6 +309,7 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             $"&level={Uri.EscapeDataString(level)}" +
             $"&date_preset={Uri.EscapeDataString(datePreset)}" +
             $"&action_attribution_windows={Uri.EscapeDataString(GraphAttributionWindowsParam)}" +
+            $"&action_breakdowns={Uri.EscapeDataString(actionBreakdowns)}" +
             $"&limit={PageLimit}";
         if (!string.IsNullOrEmpty(filteringJson))
         {
@@ -317,6 +330,12 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         var fetched = 0;
         var upserted = 0;
         var pages = 0;
+        var totalRows = 0;
+        var roasZeroCount = 0;
+        var funnelKopukCount = 0;
+        var holdEksikCount = 0;
+        var timelineEksikCount = 0;
+        var ctrSifirCount = 0;
 
         while (!string.IsNullOrEmpty(nextUrl))
         {
@@ -347,6 +366,94 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
                 if (mapped is null)
                 {
                     continue;
+                }
+
+                totalRows++;
+                var roas = mapped.Spend > 0 ? mapped.PurchaseValue / mapped.Spend : 0m;
+                _logger.LogInformation(
+                    "META_ROW level={Level} entity={EntityId} spend={Spend} impressions={Impressions} purchases={Purchases} purchaseValue={PurchaseValue} addToCart={AddToCart} initiateCheckout={InitiateCheckout} videoPlay3s={VideoPlay3s} videoThruplay={VideoThruplay} videoP25={VideoP25} videoP50={VideoP50} videoP75={VideoP75} videoP100={VideoP100} ctrLink={CtrLink} linkClicks={LinkClicks} roas={Roas}",
+                    level,
+                    mapped.EntityId,
+                    mapped.Spend,
+                    mapped.Impressions,
+                    mapped.Purchases,
+                    mapped.PurchaseValue,
+                    mapped.AddToCart,
+                    mapped.InitiateCheckout,
+                    mapped.VideoPlay3s,
+                    mapped.VideoThruplay,
+                    mapped.VideoP25,
+                    mapped.VideoP50,
+                    mapped.VideoP75,
+                    mapped.VideoP100,
+                    mapped.CtrLink,
+                    mapped.LinkClicks,
+                    roas);
+
+                if (string.Equals(level, "ad", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation(
+                        "META_ACTIONS_DUMP adId={AdId} date={Date} allActionTypes={Types}",
+                        mapped.EntityId,
+                        mapped.DateStart,
+                        SerializeActions(row));
+                }
+
+                var issues = new List<string>();
+                if (mapped.Spend > 0 && mapped.PurchaseValue == 0m)
+                {
+                    issues.Add("ROAS_ZERO:spend_var_purchase_yok");
+                    roasZeroCount++;
+                }
+
+                if (mapped.Spend > 0 && mapped.Purchases > 0 && mapped.AddToCart == 0)
+                {
+                    issues.Add("FUNNEL_KOPUK:satin_alma_var_sepet_yok");
+                    funnelKopukCount++;
+                }
+
+                if (mapped.VideoPlay3s > 0 && mapped.VideoThruplay == 0)
+                {
+                    issues.Add("HOLD_EKSIK:play3s_var_thruplay_yok");
+                    holdEksikCount++;
+                }
+
+                if (mapped.VideoPlay3s > 0 && mapped.VideoP25 == 0)
+                {
+                    issues.Add("TIMELINE_EKSIK:play3s_var_p25_yok");
+                    timelineEksikCount++;
+                }
+
+                if (mapped.Impressions > 0 && mapped.LinkClicks == 0 && mapped.Spend > 50m)
+                {
+                    issues.Add("CTR_SIFIR:harcama_var_tiklama_yok");
+                    ctrSifirCount++;
+                }
+
+                if (issues.Count > 0)
+                {
+                    _logger.LogWarning(
+                        "META_DATA_ISSUES entity={EntityId} level={Level} issues={Issues}",
+                        mapped.EntityId,
+                        level,
+                        string.Join("|", issues));
+                }
+
+                if (mapped.Spend > 100m && mapped.VideoPlay3s == 0 && string.Equals(level, "ad", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogError(
+                        "CRITICAL_MISSING video_play_3s adId={AdId} spend={Spend}",
+                        mapped.EntityId,
+                        mapped.Spend);
+                }
+
+                if (mapped.Spend > 100m && mapped.Purchases == 0 && mapped.PurchaseValue == 0m)
+                {
+                    _logger.LogError(
+                        "CRITICAL_MISSING purchases entity={EntityId} level={Level} spend={Spend}",
+                        mapped.EntityId,
+                        level,
+                        mapped.Spend);
                 }
 
                 var existing = await _db.RawInsights.FirstOrDefaultAsync(
@@ -381,6 +488,17 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
                 nextUrl = next.GetString();
             }
         }
+
+        _logger.LogInformation(
+            "META_SYNC_SUMMARY actId={ActId} level={Level} totalRows={Total} roasZero={RoasZero} funnelKopuk={FunnelKopuk} holdEksik={HoldEksik} timelineEksik={TimelineEksik} ctrSifir={CtrSifir}",
+            actId,
+            level,
+            totalRows,
+            roasZeroCount,
+            funnelKopukCount,
+            holdEksikCount,
+            timelineEksikCount,
+            ctrSifirCount);
 
         return new InsightsSyncResponseDto
         {
@@ -922,7 +1040,11 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         row.TryGetProperty("video_play_actions", out var vPlay);
         var video3s = SumVideo3s(vPlay);
 
-        var videoThru = SumMatchingActionLong(actions, ThruplayActionTypes);
+        var videoThru = SumAllActionLong(row, "video_thruplay_watched_actions");
+        if (videoThru <= 0)
+        {
+            videoThru = SumMatchingActionLong(actions, ThruplayActionTypes);
+        }
 
         var metaCampaignId = GetString(row, "campaign_id");
         if (string.IsNullOrEmpty(metaCampaignId) && string.Equals(level, "campaign", StringComparison.OrdinalIgnoreCase))
@@ -969,10 +1091,10 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             Video15Sec = SumMatchingActionLong(actions, Video15sActionTypes),
             Video30Sec = SumMatchingActionLong(actions, Video30sActionTypes),
             VideoP95 = SumMatchingActionLong(actions, VideoP95ActionTypes),
-            VideoP25 = SumMatchingActionLong(actions, VideoP25ActionTypes),
-            VideoP50 = SumMatchingActionLong(actions, VideoP50ActionTypes),
-            VideoP75 = SumMatchingActionLong(actions, VideoP75ActionTypes),
-            VideoP100 = SumMatchingActionLong(actions, VideoP100ActionTypes),
+            VideoP25 = ResolveVideoWatchedMetric(row, actions, "video_p25_watched_actions", VideoP25ActionTypes),
+            VideoP50 = ResolveVideoWatchedMetric(row, actions, "video_p50_watched_actions", VideoP50ActionTypes),
+            VideoP75 = ResolveVideoWatchedMetric(row, actions, "video_p75_watched_actions", VideoP75ActionTypes),
+            VideoP100 = ResolveVideoWatchedMetric(row, actions, "video_p100_watched_actions", VideoP100ActionTypes),
             VideoAvgWatchTime = SumMatchingActionDecimal(actions, VideoAvgTimeActionTypes),
         };
     }
@@ -1180,6 +1302,40 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         }
 
         return sum;
+    }
+
+    private static long ResolveVideoWatchedMetric(
+        JsonElement row,
+        JsonElement actions,
+        string topLevelProperty,
+        HashSet<string> actionTypes)
+    {
+        var topLevel = SumAllActionLong(row, topLevelProperty);
+        if (topLevel > 0)
+        {
+            return topLevel;
+        }
+
+        return SumMatchingActionLong(actions, actionTypes);
+    }
+
+    private static string SerializeActions(JsonElement row)
+    {
+        if (!row.TryGetProperty("actions", out var actions) || actions.ValueKind != JsonValueKind.Array)
+        {
+            return "[]";
+        }
+
+        var dumped = actions.EnumerateArray()
+            .Select(
+                a => new
+                {
+                    type = GetString(a, "action_type"),
+                    value = a.TryGetProperty("value", out var v) ? v.GetRawText().Trim('"') : "0",
+                })
+            .ToArray();
+
+        return JsonSerializer.Serialize(dumped);
     }
 
     private static void ThrowIfGraphError(string body)

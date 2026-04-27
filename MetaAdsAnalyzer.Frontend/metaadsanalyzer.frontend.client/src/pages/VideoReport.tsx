@@ -583,18 +583,36 @@ export function VideoReport() {
         { pct: 100, value: aggregate.videoP100 },
       ]
     : []
+  const timelineDrops = useMemo(() => {
+    if (!aggregate) return []
+    const segments = [
+      { key: '%25→%50', fromPct: 25, toPct: 50, from: aggregate.videoP25, to: aggregate.videoP50 },
+      { key: '%50→%75', fromPct: 50, toPct: 75, from: aggregate.videoP50, to: aggregate.videoP75 },
+      { key: '%75→%100', fromPct: 75, toPct: 100, from: aggregate.videoP75, to: aggregate.videoP100 },
+    ]
+    return segments.map((s) => {
+      const lost = Math.max(0, s.from - s.to)
+      const lossPct = s.from > 0 ? (lost / s.from) * 100 : null
+      return { ...s, lost, lossPct }
+    })
+  }, [aggregate])
+  const hasDetailedTimelineMetrics = Boolean(
+    aggregate &&
+      (aggregate.videoP25 > 0 ||
+        aggregate.videoP50 > 0 ||
+        aggregate.videoP75 > 0 ||
+        aggregate.videoP100 > 0 ||
+        aggregate.thruPlay > 0),
+  )
+  const hasOnlyPlay3s = Boolean(aggregate && aggregate.videoPlay3s > 0 && !hasDetailedTimelineMetrics)
   const biggestDrop = useMemo(() => {
     if (!aggregate) return null
     const allZero = aggregate.videoP25 <= 0 && aggregate.videoP50 <= 0 && aggregate.videoP75 <= 0 && aggregate.videoP100 <= 0
     if (allZero || aggregate.videoP25 <= 0) return null
-    const pairs = [
-      { key: '%25→%50', markerPct: 50, drop: Math.max(0, aggregate.videoP25 - aggregate.videoP50) },
-      { key: '%50→%75', markerPct: 75, drop: Math.max(0, aggregate.videoP50 - aggregate.videoP75) },
-      { key: '%75→%100', markerPct: 100, drop: Math.max(0, aggregate.videoP75 - aggregate.videoP100) },
-    ]
+    const pairs = timelineDrops.map((d) => ({ ...d, markerPct: d.toPct, drop: d.lost }))
     const picked = pairs.sort((a, b) => b.drop - a.drop)[0]
-    return { ...picked, leavePct: (picked.drop / aggregate.videoP25) * 100 }
-  }, [aggregate])
+    return { ...picked, leavePct: (picked.drop / aggregate.videoP25) * 100, lostCount: picked.drop }
+  }, [aggregate, timelineDrops])
 
   return (
     <div className="page">
@@ -957,19 +975,41 @@ export function VideoReport() {
                 </div>
                 {biggestDrop ? (
                   <>
-                    <div
-                      className="vr-drop-arrow"
-                      style={{ left: `${biggestDrop.markerPct}%` }}
-                      title={`En fazla izleyici kaybi burada — izleyicilerin %${biggestDrop.leavePct.toFixed(1)}'i bu noktada ayrildi`}
-                    >
-                      ↓
+                    <div className="vr-drop-indicator" style={{ left: `${biggestDrop.markerPct}%` }}>
+                      <div className="vr-drop-tooltip">
+                        <strong>⚠ En fazla izleyici kaybı</strong>
+                        <span>
+                          %{biggestDrop.fromPct}→%{biggestDrop.toPct}: {biggestDrop.lostCount.toLocaleString('tr-TR')} kişi ayrıldı
+                        </span>
+                      </div>
+                      <div className="vr-drop-pulse-dot" aria-hidden="true" />
                     </div>
                     <p className="vr-drop-marker">En buyuk kayip: {biggestDrop.key}</p>
                   </>
                 ) : (
-                  <p className="vr-drop-marker">Yeterli video izlenme verisi yok</p>
+                  <p className="vr-drop-marker">
+                    {hasOnlyPlay3s
+                      ? 'Meta bu reklam için yalnızca 3sn izlenmeyi döndürdü; p25/p50/p75/p100 verisi yok.'
+                      : 'Yeterli video izlenme verisi yok'}
+                  </p>
+                )}
+                {timelineDrops.length > 0 && (
+                  <div className="vr-quarter-drops">
+                    {timelineDrops.map((d) => (
+                      <div key={d.key} className="vr-quarter-drop-item">
+                        <span>{d.key}</span>
+                        <strong>{d.lost.toLocaleString('tr-TR')} kişi</strong>
+                        <em>{d.lossPct == null ? 'Düşüş —' : `Düşüş ${d.lossPct.toFixed(1)}%`}</em>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
+            )}
+            {!isVideoAggregate && (
+              <p className="muted small" style={{ marginTop: '0.65rem' }}>
+                Analiz edilen icerik video metrik degildir.
+              </p>
             )}
 
             <div className="vr-metric-content">

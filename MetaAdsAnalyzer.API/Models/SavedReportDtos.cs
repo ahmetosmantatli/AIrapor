@@ -86,11 +86,34 @@ public sealed class SavedReportImpactFeedItemDto
     public int SavedReportId { get; set; }
     public string AdId { get; set; } = null!;
     public string? AdName { get; set; }
+    public string? CampaignId { get; set; }
+    public string? CampaignName { get; set; }
+    public string? AdsetId { get; set; }
+    public string? AdsetName { get; set; }
     public DateTimeOffset AppliedAt { get; set; }
     public DateTimeOffset? ImpactMeasuredAt { get; set; }
     public decimal? BeforeRoas { get; set; }
     public decimal? AfterRoas { get; set; }
+    public decimal? BeforeSpend { get; set; }
+    public decimal? AfterSpend { get; set; }
+    public int? BeforePurchases { get; set; }
+    public int? AfterPurchases { get; set; }
+    public decimal? BeforeHookRate { get; set; }
+    public decimal? AfterHookRate { get; set; }
+    public decimal? BeforeHoldRate { get; set; }
+    public decimal? AfterHoldRate { get; set; }
+    public string? DirectiveType { get; set; }
+    public string? Severity { get; set; }
+    public string? Message { get; set; }
+    public string? Symptom { get; set; }
+    public string? Reason { get; set; }
+    public string? Action { get; set; }
     public bool MetaChangeDetected { get; set; }
     public string? MetaChangeMessage { get; set; }
+}
+
+public sealed class SavedReportImpactDetailDto : SavedReportImpactFeedItemDto
+{
+    public DateTimeOffset AnalyzedAt { get; set; }
 }
 

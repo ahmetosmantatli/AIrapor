@@ -276,6 +276,59 @@ export function AnalyzedAds() {
     }
   }, [active, activeRawLatest])
 
+  const timelineAggregate = useMemo(() => {
+    if (!active) return null
+    return activeAggregate ?? active.aggregate
+  }, [active, activeAggregate])
+
+  const timelineValues = useMemo(() => {
+    if (!timelineAggregate) return []
+    return [
+      { pct: 25, value: timelineAggregate.videoP25 },
+      { pct: 50, value: timelineAggregate.videoP50 },
+      { pct: 75, value: timelineAggregate.videoP75 },
+      { pct: 100, value: timelineAggregate.videoP100 },
+    ]
+  }, [timelineAggregate])
+
+  const timelineDrops = useMemo(() => {
+    if (!timelineAggregate) return []
+    const segments = [
+      { key: '%25→%50', fromPct: 25, toPct: 50, from: timelineAggregate.videoP25, to: timelineAggregate.videoP50 },
+      { key: '%50→%75', fromPct: 50, toPct: 75, from: timelineAggregate.videoP50, to: timelineAggregate.videoP75 },
+      { key: '%75→%100', fromPct: 75, toPct: 100, from: timelineAggregate.videoP75, to: timelineAggregate.videoP100 },
+    ]
+    return segments.map((s) => {
+      const lost = Math.max(0, s.from - s.to)
+      const lossPct = s.from > 0 ? (lost / s.from) * 100 : null
+      return { ...s, lost, lossPct }
+    })
+  }, [timelineAggregate])
+
+  const hasDetailedTimelineMetrics = Boolean(
+    timelineAggregate &&
+      (timelineAggregate.videoP25 > 0 ||
+        timelineAggregate.videoP50 > 0 ||
+        timelineAggregate.videoP75 > 0 ||
+        timelineAggregate.videoP100 > 0 ||
+        timelineAggregate.thruPlay > 0),
+  )
+
+  const hasOnlyPlay3s = Boolean(timelineAggregate && timelineAggregate.videoPlay3s > 0 && !hasDetailedTimelineMetrics)
+
+  const biggestDrop = useMemo(() => {
+    if (!timelineAggregate) return null
+    const allZero =
+      timelineAggregate.videoP25 <= 0 &&
+      timelineAggregate.videoP50 <= 0 &&
+      timelineAggregate.videoP75 <= 0 &&
+      timelineAggregate.videoP100 <= 0
+    if (allZero || timelineAggregate.videoP25 <= 0) return null
+    const pairs = timelineDrops.map((d) => ({ ...d, markerPct: d.toPct, drop: d.lost }))
+    const picked = pairs.sort((a, b) => b.drop - a.drop)[0]
+    return { ...picked, leavePct: (picked.drop / timelineAggregate.videoP25) * 100, lostCount: picked.drop }
+  }, [timelineAggregate, timelineDrops])
+
   return (
     <div className="page">
       <h1 className="page-title">Analiz edilen reklamlar</h1>
@@ -463,23 +516,51 @@ export function AnalyzedAds() {
                 <h3>Video Zaman Çizgisi</h3>
                 <div className="vr-timeline-bar" />
                 <div className="vr-timeline-points">
-                  {[25, 50, 75, 100].map((pctVal) => {
-                    const value =
-                      pctVal === 25
-                        ? (activeAggregate ?? active.aggregate).videoP25
-                        : pctVal === 50
-                          ? (activeAggregate ?? active.aggregate).videoP50
-                          : pctVal === 75
-                            ? (activeAggregate ?? active.aggregate).videoP75
-                            : (activeAggregate ?? active.aggregate).videoP100
+                  {timelineValues.map((p) => {
                     return (
-                      <div key={pctVal} className="vr-timeline-point" style={{ left: `${pctVal}%` }}>
-                        <span>{pctVal}%</span>
-                        <strong>{value.toLocaleString('tr-TR')}</strong>
+                      <div key={p.pct} className="vr-timeline-point" style={{ left: `${p.pct}%` }}>
+                        <span>{p.pct}%</span>
+                        <strong>{p.value.toLocaleString('tr-TR')}</strong>
+                        <em className="muted small">
+                          {timelineAggregate && timelineAggregate.impressions > 0
+                            ? `%${((p.value / timelineAggregate.impressions) * 100).toFixed(1)} izledi`
+                            : '%0.0 izledi'}
+                        </em>
                       </div>
                     )
                   })}
                 </div>
+                {biggestDrop ? (
+                  <>
+                    <div className="vr-drop-indicator" style={{ left: `${biggestDrop.markerPct}%` }}>
+                      <div className="vr-drop-tooltip">
+                        <strong>⚠ En fazla izleyici kaybı</strong>
+                        <span>
+                          %{biggestDrop.fromPct}→%{biggestDrop.toPct}: {biggestDrop.lostCount.toLocaleString('tr-TR')} kişi ayrıldı
+                        </span>
+                      </div>
+                      <div className="vr-drop-pulse-dot" aria-hidden="true" />
+                    </div>
+                    <p className="vr-drop-marker">En buyuk kayip: {biggestDrop.key}</p>
+                  </>
+                ) : (
+                  <p className="vr-drop-marker">
+                    {hasOnlyPlay3s
+                      ? 'Meta bu reklam için yalnızca 3sn izlenmeyi döndürdü; p25/p50/p75/p100 verisi yok.'
+                      : 'Yeterli video izlenme verisi yok'}
+                  </p>
+                )}
+                {timelineDrops.length > 0 && (
+                  <div className="vr-quarter-drops">
+                    {timelineDrops.map((d) => (
+                      <div key={d.key} className="vr-quarter-drop-item">
+                        <span>{d.key}</span>
+                        <strong>{d.lost.toLocaleString('tr-TR')} kişi</strong>
+                        <em>{d.lossPct == null ? 'Düşüş —' : `Düşüş ${d.lossPct.toFixed(1)}%`}</em>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

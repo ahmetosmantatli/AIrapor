@@ -1,8 +1,11 @@
 using MetaAdsAnalyzer.API.Models;
 using MetaAdsAnalyzer.API.Security;
 using MetaAdsAnalyzer.API.Services;
+using MetaAdsAnalyzer.Core;
+using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MetaAdsAnalyzer.API.Controllers;
 
@@ -14,11 +17,19 @@ namespace MetaAdsAnalyzer.API.Controllers;
 public class VideoReportController : ControllerBase
 {
     private readonly IVideoReportInsightService _insights;
+    private readonly IMetaInsightsSyncService _metaInsights;
+    private readonly AppDbContext _db;
     private readonly ILogger<VideoReportController> _logger;
 
-    public VideoReportController(IVideoReportInsightService insights, ILogger<VideoReportController> logger)
+    public VideoReportController(
+        IVideoReportInsightService insights,
+        IMetaInsightsSyncService metaInsights,
+        AppDbContext db,
+        ILogger<VideoReportController> logger)
     {
         _insights = insights;
+        _metaInsights = metaInsights;
+        _db = db;
         _logger = logger;
     }
 
@@ -64,8 +75,95 @@ public class VideoReportController : ControllerBase
             body.MetaAdAccountId ?? "(null)",
             string.Join(",", adIds.Take(20)) + (adIds.Count > 20 ? "…" : string.Empty));
 
+        // Keep video timelines fresh: when ad-level raw insights are older than 4h,
+        // force a targeted sync for only the analyzed adIds.
+        var normalizedAct = MetaAdAccountIdNormalizer.Normalize(body.MetaAdAccountId);
+        var freshSince = DateTimeOffset.UtcNow.AddHours(-4);
+        var staleOrMissing = await GetStaleOrMissingAdIdsAsync(body.UserId, normalizedAct, adIds, freshSince, cancellationToken)
+            .ConfigureAwait(false);
+        if (staleOrMissing.Count > 0)
+        {
+            _logger.LogInformation(
+                "VideoReport aggregate pre-sync started UserId={UserId} Act={Act} AdIds={AdCount} StaleOrMissing={StaleCount}",
+                body.UserId,
+                normalizedAct ?? "(default)",
+                adIds.Count,
+                staleOrMissing.Count);
+
+            await _metaInsights.SyncInsightsAsync(
+                    body.UserId,
+                    "ad",
+                    "last_30d",
+                    null,
+                    normalizedAct,
+                    staleOrMissing,
+                    true,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         var dto = await _insights.BuildAggregateAsync(body.UserId, body.MetaAdAccountId, adIds, cancellationToken)
             .ConfigureAwait(false);
         return Ok(dto);
+    }
+
+    private async Task<List<string>> GetStaleOrMissingAdIdsAsync(
+        int userId,
+        string? metaAdAccountId,
+        IReadOnlyList<string> adIds,
+        DateTimeOffset freshSince,
+        CancellationToken cancellationToken)
+    {
+        var query = _db.RawInsights
+            .AsNoTracking()
+            .Where(r =>
+                r.UserId == userId
+                && r.Level == "ad"
+                && adIds.Contains(r.EntityId));
+
+        if (!string.IsNullOrWhiteSpace(metaAdAccountId))
+        {
+            query = query.Where(r => r.MetaAdAccountId == metaAdAccountId);
+        }
+
+        var candidates = await query
+            .OrderByDescending(r => r.FetchedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var latestByAd = new Dictionary<string, Core.Entities.RawInsight>(StringComparer.Ordinal);
+        foreach (var row in candidates)
+        {
+            if (!latestByAd.ContainsKey(row.EntityId))
+            {
+                latestByAd[row.EntityId] = row;
+            }
+        }
+
+        var staleOrMissing = new List<string>(adIds.Count);
+        foreach (var adId in adIds)
+        {
+            if (!latestByAd.TryGetValue(adId, out var latest))
+            {
+                staleOrMissing.Add(adId);
+                continue;
+            }
+
+            var stale = latest.FetchedAt < freshSince;
+            var incompleteTimeline =
+                latest.VideoPlay3s > 0
+                && latest.VideoThruplay == 0
+                && latest.VideoP25 == 0
+                && latest.VideoP50 == 0
+                && latest.VideoP75 == 0
+                && latest.VideoP100 == 0;
+
+            if (stale || incompleteTimeline)
+            {
+                staleOrMissing.Add(adId);
+            }
+        }
+
+        return staleOrMissing;
     }
 }

@@ -26,6 +26,7 @@ import type {
   SavedReportItem,
   SavedReportSuggestion,
   SavedReportImpactFeedItem,
+  SavedReportImpactDetail,
 } from './types'
 
 function assertPositiveUserId(userId: number, context: string): void {
@@ -495,4 +496,14 @@ export async function listSavedReportImpacts(
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json() as Promise<SavedReportImpactFeedItem[]>
+}
+
+export async function getSavedReportImpactDetail(
+  suggestionId: number,
+): Promise<SavedReportImpactDetail> {
+  const res = await authFetch(`/api/saved-reports/impacts/suggestions/${suggestionId}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<SavedReportImpactDetail>
 }

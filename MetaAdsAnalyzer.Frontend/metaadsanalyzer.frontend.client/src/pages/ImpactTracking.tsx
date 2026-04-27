@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getRawInsights, postInsightsSync } from '../api/client'
-import { listAnalyzedAds } from '../features/analyzedAdsStore'
+import { getRawInsights, getSavedReportImpactDetail, listSavedReportImpacts, postInsightsSync } from '../api/client'
 import { useUser } from '../context/UserContext'
 import './Pages.css'
 
@@ -19,10 +18,18 @@ type TrendPoint = {
 
 type ImpactRow = {
   reportId: number
-  suggestionId: string
+  suggestionId: number
   adName: string
   adId: string
+  campaignName: string | null
+  adsetName: string | null
+  directiveType: string | null
+  severity: string | null
+  message: string | null
+  reason: string | null
+  action: string | null
   appliedAt: string
+  analyzedAt: string | null
   impactMeasuredAt: string | null
   beforeRoas: number | null
   afterRoas: number | null
@@ -56,8 +63,11 @@ function sameAdId(left: string, right: string): boolean {
 export function ImpactTracking() {
   const { userId } = useUser()
   const [rows, setRows] = useState<ImpactRow[]>([])
-  const [expandedSuggestionId, setExpandedSuggestionId] = useState<string | null>(null)
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState<number | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [latestRawRoas, setLatestRawRoas] = useState<number | null>(null)
+  const [latestRawSpend, setLatestRawSpend] = useState<number | null>(null)
+  const [latestRawPurchases, setLatestRawPurchases] = useState<number | null>(null)
   const [latestRawAt, setLatestRawAt] = useState<string | null>(null)
   const threeHostRef = useRef<HTMLDivElement | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,50 +79,34 @@ export function ImpactTracking() {
       setLoading(true)
       setError(null)
       try {
-        const reports = await listAnalyzedAds(userId)
-        const flat: ImpactRow[] = []
-        const reportsByAd = new Map<string, typeof reports>()
-        for (const r of reports) {
-          const list = reportsByAd.get(r.adId) ?? []
-          list.push(r)
-          reportsByAd.set(r.adId, list)
-        }
-        for (const [, list] of reportsByAd) {
-          list.sort((a, b) => a.analyzedAt.localeCompare(b.analyzedAt))
-        }
-        for (const r of reports) {
-          for (const s of r.recommendations) {
-            const appliedAt = s.appliedAt ?? (s.status === 'applied' ? r.analyzedAt : null)
-            if (!appliedAt) continue
-            const timeline = (reportsByAd.get(r.adId) ?? [])
-              .filter((x) => x.analyzedAt >= appliedAt)
-              .map((x) => ({
-                at: x.analyzedAt,
-                roas: x.aggregate.roas ?? null,
-                spend: x.aggregate.spend ?? null,
-                purchases: x.aggregate.purchases ?? null,
-              }))
-            flat.push({
-              reportId: Number(r.id) || 0,
-              suggestionId: String(s.id),
-              adName: r.adName ?? r.adId,
-              adId: r.adId,
-              appliedAt,
-              impactMeasuredAt: s.impactMeasuredAt ?? null,
-              beforeRoas: s.beforeRoas ?? null,
-              afterRoas: s.afterRoas ?? null,
-              metaChangeDetected: s.metaChangeDetected !== false,
-              metaChangeMessage: s.metaChangeMessage ?? null,
-              beforeSpend: s.beforeSpend ?? null,
-              afterSpend: s.afterSpend ?? null,
-              beforePurchases: s.beforePurchases ?? null,
-              afterPurchases: s.afterPurchases ?? null,
-              trend: timeline,
-            })
-          }
-        }
-        flat.sort((a, b) => (b.impactMeasuredAt ?? b.appliedAt).localeCompare(a.impactMeasuredAt ?? a.appliedAt))
-        if (!cancelled) setRows(flat)
+        const impacts = await listSavedReportImpacts(userId, 50)
+        if (cancelled) return
+        const flat: ImpactRow[] = impacts.map((x) => ({
+          reportId: x.savedReportId,
+          suggestionId: x.suggestionId,
+          adName: x.adName ?? x.adId,
+          adId: x.adId,
+          campaignName: x.campaignName ?? null,
+          adsetName: x.adsetName ?? null,
+          directiveType: x.directiveType ?? null,
+          severity: x.severity ?? null,
+          message: x.message ?? null,
+          reason: x.reason ?? null,
+          action: x.action ?? null,
+          appliedAt: x.appliedAt,
+          analyzedAt: null,
+          impactMeasuredAt: x.impactMeasuredAt ?? null,
+          beforeRoas: x.beforeRoas ?? null,
+          afterRoas: x.afterRoas ?? null,
+          metaChangeDetected: x.metaChangeDetected !== false,
+          metaChangeMessage: x.metaChangeMessage ?? null,
+          beforeSpend: x.beforeSpend ?? null,
+          afterSpend: x.afterSpend ?? null,
+          beforePurchases: x.beforePurchases ?? null,
+          afterPurchases: x.afterPurchases ?? null,
+          trend: [],
+        }))
+        setRows(flat)
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Etki verisi alınamadı')
       } finally {
@@ -124,9 +118,51 @@ export function ImpactTracking() {
     }
   }, [userId])
 
-  const expandedRow = useMemo(
-    () => rows.find((r) => r.suggestionId === expandedSuggestionId) ?? null,
-    [rows, expandedSuggestionId],
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedSuggestionId) return
+    ;(async () => {
+      try {
+        const detail = await getSavedReportImpactDetail(selectedSuggestionId)
+        if (cancelled) return
+        setRows((prev) =>
+          prev.map((r) =>
+            r.suggestionId === selectedSuggestionId
+              ? {
+                  ...r,
+                  analyzedAt: detail.analyzedAt,
+                  campaignName: detail.campaignName ?? r.campaignName,
+                  adsetName: detail.adsetName ?? r.adsetName,
+                  directiveType: detail.directiveType ?? r.directiveType,
+                  severity: detail.severity ?? r.severity,
+                  message: detail.message ?? r.message,
+                  reason: detail.reason ?? r.reason,
+                  action: detail.action ?? r.action,
+                  beforeRoas: detail.beforeRoas ?? r.beforeRoas,
+                  afterRoas: detail.afterRoas ?? r.afterRoas,
+                  beforeSpend: detail.beforeSpend ?? r.beforeSpend,
+                  afterSpend: detail.afterSpend ?? r.afterSpend,
+                  beforePurchases: detail.beforePurchases ?? r.beforePurchases,
+                  afterPurchases: detail.afterPurchases ?? r.afterPurchases,
+                  impactMeasuredAt: detail.impactMeasuredAt ?? r.impactMeasuredAt,
+                  metaChangeDetected: detail.metaChangeDetected,
+                  metaChangeMessage: detail.metaChangeMessage ?? r.metaChangeMessage,
+                }
+              : r,
+          ),
+        )
+      } catch {
+        // keep feed snapshot if detail fetch fails
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSuggestionId])
+
+  const selectedRow = useMemo(
+    () => rows.find((r) => r.suggestionId === selectedSuggestionId) ?? null,
+    [rows, selectedSuggestionId],
   )
 
   const avgRoasDelta = useMemo(() => {
@@ -137,64 +173,64 @@ export function ImpactTracking() {
   }, [rows])
 
   const gainDelta = useMemo(() => {
-    if (!expandedRow || expandedRow.beforeRoas == null || latestRawRoas == null) return null
-    return latestRawRoas - expandedRow.beforeRoas
-  }, [expandedRow, latestRawRoas])
+    if (!selectedRow || selectedRow.beforeRoas == null || latestRawRoas == null) return null
+    return latestRawRoas - selectedRow.beforeRoas
+  }, [selectedRow, latestRawRoas])
 
   const daysSinceApplied = useMemo(() => {
-    if (!expandedRow) return 0
-    const d = Math.floor((Date.now() - new Date(expandedRow.appliedAt).getTime()) / 86400000)
+    if (!selectedRow) return 0
+    const d = Math.floor((Date.now() - new Date(selectedRow.appliedAt).getTime()) / 86400000)
     return Math.max(0, d)
-  }, [expandedRow])
+  }, [selectedRow])
 
   const pendingDays = Math.max(0, 7 - daysSinceApplied)
 
   useEffect(() => {
     let cancelled = false
-    if (!expandedRow) {
+    if (!selectedRow) {
       setLatestRawRoas(null)
+      setLatestRawSpend(null)
+      setLatestRawPurchases(null)
       setLatestRawAt(null)
       return
     }
     ;(async () => {
       try {
         // Kart açıldığında ilgili reklam için güncel insight çekmeyi dener.
-        await postInsightsSync(userId, 'ad', 'last_90d', { adId: expandedRow.adId }).catch(() => undefined)
-        const rows = await getRawInsights(userId, 'ad', { adId: expandedRow.adId, limit: 1 })
+        await postInsightsSync(userId, 'ad', 'last_90d', { adId: selectedRow.adId }).catch(() => undefined)
+        const rows = await getRawInsights(userId, 'ad', { adId: selectedRow.adId, limit: 1 })
         if (cancelled) return
-        const appliedAtMs = new Date(expandedRow.appliedAt).getTime()
+        const appliedAtMs = new Date(selectedRow.appliedAt).getTime()
         const adRows = rows
-          .filter((r) => sameAdId(r.entityId, expandedRow.adId))
+          .filter((r) => sameAdId(r.entityId, selectedRow.adId))
           .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))
         const latestAfterApplied = adRows.find(
           (r) => r.roas != null && Number.isFinite(r.roas) && new Date(r.fetchedAt).getTime() >= appliedAtMs,
         )
         const latestAny = adRows.find((r) => r.roas != null && Number.isFinite(r.roas))
-        const trendLatest = [...expandedRow.trend]
-          .filter((t) => t.roas != null && Number.isFinite(t.roas))
-          .sort((a, b) => b.at.localeCompare(a.at))[0]
         const selected = latestAfterApplied ?? latestAny ?? null
         setLatestRawRoas(
-          selected?.roas ?? trendLatest?.roas ?? expandedRow.afterRoas ?? expandedRow.beforeRoas ?? null,
+          selected?.roas ?? selectedRow.afterRoas ?? selectedRow.beforeRoas ?? null,
         )
-        setLatestRawAt(selected?.fetchedAt ?? trendLatest?.at ?? expandedRow.appliedAt ?? null)
+        setLatestRawSpend(selected?.spend ?? selectedRow.afterSpend ?? selectedRow.beforeSpend ?? null)
+        setLatestRawPurchases(selected?.purchases ?? selectedRow.afterPurchases ?? selectedRow.beforePurchases ?? null)
+        setLatestRawAt(selected?.fetchedAt ?? selectedRow.appliedAt ?? null)
       } catch {
         if (!cancelled) {
-          const trendLatest = [...expandedRow.trend]
-            .filter((t) => t.roas != null && Number.isFinite(t.roas))
-            .sort((a, b) => b.at.localeCompare(a.at))[0]
-          setLatestRawRoas(trendLatest?.roas ?? expandedRow.afterRoas ?? expandedRow.beforeRoas ?? null)
-          setLatestRawAt(trendLatest?.at ?? expandedRow.appliedAt ?? null)
+          setLatestRawRoas(selectedRow.afterRoas ?? selectedRow.beforeRoas ?? null)
+          setLatestRawSpend(selectedRow.afterSpend ?? selectedRow.beforeSpend ?? null)
+          setLatestRawPurchases(selectedRow.afterPurchases ?? selectedRow.beforePurchases ?? null)
+          setLatestRawAt(selectedRow.appliedAt ?? null)
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [expandedRow, userId])
+  }, [selectedRow, userId])
 
   useEffect(() => {
-    if (!expandedRow || !threeHostRef.current) return
+    if (!detailOpen || !selectedRow || !threeHostRef.current) return
     let disposed = false
     let rafId = 0
     let cleanup: (() => void) | null = null
@@ -370,7 +406,7 @@ export function ImpactTracking() {
       disposed = true
       cleanup?.()
     }
-  }, [expandedRow])
+  }, [detailOpen, selectedRow])
 
   return (
     <div className="page">
@@ -395,7 +431,8 @@ export function ImpactTracking() {
               key={`${r.reportId}-${r.suggestionId}-${r.appliedAt}`}
               className="impact-card"
               onClick={() => {
-                setExpandedSuggestionId(r.suggestionId)
+                setSelectedSuggestionId(r.suggestionId)
+                setDetailOpen(false)
               }}
             >
               <div className="impact-card-head">
@@ -403,6 +440,7 @@ export function ImpactTracking() {
                 <span className="muted small">{days}g</span>
               </div>
               <div className="muted small">Reklam {r.adId}</div>
+              <div className="muted small">{r.campaignName ?? 'Kampanya —'} · {r.adsetName ?? 'Adset —'}</div>
               <div className="muted small">Uygulama: {new Date(r.appliedAt).toLocaleString('tr-TR')}</div>
               <div className="impact-card-body">
                 {r.impactMeasuredAt ? (
@@ -427,11 +465,13 @@ export function ImpactTracking() {
           )
         })}
       </div>
-      {expandedRow ? (
+
+      {selectedRow ? (
         <div
           className="vr-modal-overlay"
           onClick={() => {
-            setExpandedSuggestionId(null)
+            setSelectedSuggestionId(null)
+            setDetailOpen(false)
           }}
         >
           <section className="vr-modal impact-modal" onClick={(e) => e.stopPropagation()}>
@@ -439,7 +479,8 @@ export function ImpactTracking() {
               type="button"
               className="vr-modal-close"
               onClick={() => {
-                setExpandedSuggestionId(null)
+                setSelectedSuggestionId(null)
+                setDetailOpen(false)
               }}
               aria-label="Kapat"
             >
@@ -447,8 +488,84 @@ export function ImpactTracking() {
             </button>
             <h2 className="panel-title">Seçili öneri etkisi</h2>
             <p className="muted small" style={{ marginBottom: '0.75rem' }}>
-              Uygulama başlangıcı: {new Date(expandedRow.appliedAt).toLocaleString('tr-TR')} · {expandedRow.adName}
+              Uygulama başlangıcı: {new Date(selectedRow.appliedAt).toLocaleString('tr-TR')} · {selectedRow.adName}
             </p>
+            <div className="dashboard-mini-stats" style={{ marginBottom: '0.75rem' }}>
+              <div>
+                <span>Öneri Tipi</span>
+                <strong>{selectedRow.directiveType ?? '—'}</strong>
+              </div>
+              <div>
+                <span>Öncelik</span>
+                <strong>{selectedRow.severity ?? '—'}</strong>
+              </div>
+              <div>
+                <span>Kampanya / Adset</span>
+                <strong>{selectedRow.campaignName ?? 'Kampanya —'} · {selectedRow.adsetName ?? 'Adset —'}</strong>
+              </div>
+              <div>
+                <span>İzlenen Durum</span>
+                <strong>{selectedRow.metaChangeDetected ? 'Aktif değişim takibi' : 'Meta değişimi tespit edilmedi'}</strong>
+              </div>
+            </div>
+            <div className="impact-banner impact-banner-info" style={{ marginBottom: 0 }}>
+              Detaylı before/after kıyas için Detaylar butonuna tıklayın.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  setDetailOpen(true)
+                }}
+              >
+                Detaylar
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {detailOpen && selectedRow ? (
+        <div
+          className="vr-modal-overlay"
+          onClick={() => {
+            setDetailOpen(false)
+          }}
+        >
+          <section className="vr-modal impact-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="vr-modal-close"
+              onClick={() => {
+                setDetailOpen(false)
+              }}
+              aria-label="Kapat"
+            >
+              ×
+            </button>
+            <h2 className="panel-title">Seçili öneri etkisi</h2>
+            <p className="muted small" style={{ marginBottom: '0.75rem' }}>
+              Uygulama başlangıcı: {new Date(selectedRow.appliedAt).toLocaleString('tr-TR')} · {selectedRow.adName}
+            </p>
+            <div className="dashboard-mini-stats" style={{ marginBottom: '0.75rem' }}>
+              <div>
+                <span>Öneri Tipi</span>
+                <strong>{selectedRow.directiveType ?? '—'}</strong>
+              </div>
+              <div>
+                <span>Öncelik</span>
+                <strong>{selectedRow.severity ?? '—'}</strong>
+              </div>
+              <div>
+                <span>Mesaj</span>
+                <strong>{selectedRow.message ?? '—'}</strong>
+              </div>
+              <div>
+                <span>Aksiyon</span>
+                <strong>{selectedRow.action ?? '—'}</strong>
+              </div>
+            </div>
 
             <div className="impact-modal-chart">
               <h3 className="panel-title impact-modal-subtitle">AI görselleştirme</h3>
@@ -467,15 +584,15 @@ export function ImpactTracking() {
 
             <div>
               <h3 className="panel-title impact-modal-subtitle">Seçilen gün performans farkı</h3>
-              {expandedRow.beforeRoas == null ? (
+              {selectedRow.beforeRoas == null ? (
                 <p className="impact-banner impact-banner-warn">
                   Meta'da değişiklik yaptıktan sonra 'Uygula' butonuna basın — sistem uygulama öncesi metriklerinizi
                   otomatik kaydeder.
                 </p>
               ) : null}
-              {expandedRow.beforeRoas != null && latestRawRoas != null && gainDelta != null && Math.abs(gainDelta) < 0.1 && daysSinceApplied >= 7 ? (
+              {selectedRow.beforeRoas != null && latestRawRoas != null && gainDelta != null && Math.abs(gainDelta) < 0.1 && daysSinceApplied >= 1 ? (
                 <p className="impact-banner impact-banner-orange">
-                  Meta'da değişiklik yapmamış olabilirsiniz — reklamı kontrol edin.
+                  Meta reklam hesabınızı kontrol ediniz: Uygulandı kabul ettiğiniz değerler uygulanmamıştır.
                 </p>
               ) : null}
               {daysSinceApplied < 7 ? (
@@ -486,7 +603,7 @@ export function ImpactTracking() {
               <div className="dashboard-mini-stats">
                 <div>
                   <span>Uygulama öncesi ROAS</span>
-                  <strong>{expandedRow.beforeRoas == null ? '—' : `${expandedRow.beforeRoas.toFixed(2)}x`}</strong>
+                  <strong>{selectedRow.beforeRoas == null ? '—' : `${selectedRow.beforeRoas.toFixed(2)}x`}</strong>
                 </div>
                 <div>
                   <span>Seçilen gün ROAS</span>
@@ -502,6 +619,37 @@ export function ImpactTracking() {
                   <span>İncelenen tarih</span>
                   <strong>{latestRawAt ? new Date(latestRawAt).toLocaleString('tr-TR') : '—'}</strong>
                 </div>
+              </div>
+              <div className="dashboard-mini-stats" style={{ marginTop: '0.5rem' }}>
+                <div>
+                  <span>Uygulama öncesi Harcama</span>
+                  <strong>{selectedRow.beforeSpend == null ? '—' : `₺${selectedRow.beforeSpend.toFixed(2)}`}</strong>
+                </div>
+                <div>
+                  <span>Güncel Harcama</span>
+                  <strong>{latestRawSpend == null ? '—' : `₺${latestRawSpend.toFixed(2)}`}</strong>
+                </div>
+                <div>
+                  <span>Uygulama öncesi Satın Alma</span>
+                  <strong>{selectedRow.beforePurchases == null ? '—' : selectedRow.beforePurchases}</strong>
+                </div>
+                <div>
+                  <span>Güncel Satın Alma</span>
+                  <strong>{latestRawPurchases == null ? '—' : latestRawPurchases}</strong>
+                </div>
+              </div>
+
+              <div className="panel" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                <h3 className="panel-title" style={{ marginBottom: '0.4rem' }}>Uygulanan öneri</h3>
+                <p className="muted small" style={{ margin: 0 }}>
+                  {selectedRow.message ?? 'Öneri metni bulunamadı.'}
+                </p>
+                <p className="muted small" style={{ margin: '0.35rem 0 0' }}>
+                  {selectedRow.reason ?? 'Neden bilgisi bulunamadı.'}
+                </p>
+                <p style={{ margin: '0.4rem 0 0', fontWeight: 600 }}>
+                  {selectedRow.action ?? 'Aksiyon bilgisi bulunamadı.'}
+                </p>
               </div>
             </div>
           </section>
