@@ -25,7 +25,6 @@ import type {
   MetaAdListItem,
   MetaAdsetItem,
   MetaCampaignItem,
-  RawInsightRow,
   VideoReportAggregateResponse,
 } from '../api/types'
 import { useUser } from '../context/UserContext'
@@ -69,20 +68,6 @@ type AdAnalysisResult = {
   directives: DirectiveItem[]
   selectedGroup: VideoGroup
   savedAnalyzedItem: AnalyzedAdItem | null
-}
-
-function buildSpendByAdId(raws: RawInsightRow[]): Map<string, number> {
-  const latest = new Map<string, RawInsightRow>()
-  for (const r of raws) {
-    if (r.level !== 'ad') continue
-    const prev = latest.get(r.entityId)
-    if (!prev || r.fetchedAt > prev.fetchedAt) latest.set(r.entityId, r)
-  }
-  const m = new Map<string, number>()
-  for (const r of latest.values()) {
-    m.set(r.entityId, r.spend)
-  }
-  return m
 }
 
 function buildStatusLine(ads: MetaAdListItem[]): string {
@@ -249,7 +234,7 @@ export function VideoReport() {
 
   const [campaigns, setCampaigns] = useState<MetaCampaignItem[]>([])
   const [campaignsLoading, setCampaignsLoading] = useState(false)
-  const [campaignsError, setCampaignsError] = useState<string | null>(null)
+  const [, setCampaignsError] = useState<string | null>(null)
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
 
   const [adsetsLoading, setAdsetsLoading] = useState(false)
