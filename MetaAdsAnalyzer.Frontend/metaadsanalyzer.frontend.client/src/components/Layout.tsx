@@ -1,8 +1,6 @@
 import {
-  BarChart3,
   Building2,
   Clapperboard,
-  ImageIcon,
   Activity,
   LayoutDashboard,
   Link2,
@@ -25,9 +23,7 @@ const nav: Array<{
   { to: '/app/accounts', label: 'Reklam hesapları', icon: Building2 },
   { to: '/app/dashboard', label: 'Özet', icon: LayoutDashboard },
   { to: '/app/video-report', label: 'AI Video Rapor', icon: Clapperboard },
-  { to: '/app/analyzed-ads', label: 'Analiz edilen reklamlar', icon: BarChart3 },
   { to: '/app/impact-tracking', label: 'Etki Takibi', icon: Activity },
-  { to: '/app/creatives', label: 'Kreatif', icon: ImageIcon },
   { to: '/app/settings', label: 'Ayarlar', icon: Settings },
   { to: '/connect', label: 'Meta', icon: Link2 },
 ]

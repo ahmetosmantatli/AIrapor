@@ -453,6 +453,11 @@ tr.ad-picker-row-selected td {
   color: #fff;
 }
 
+.btn.btn-sm {
+  padding: 0.34rem 0.62rem;
+  font-size: 0.78rem;
+}
+
 .btn.large {
   padding: 0.75rem 1.25rem;
   font-size: 1rem;
@@ -1122,6 +1127,42 @@ code {
 .campaign-kpis strong {
   display: block;
   margin-top: 0.1rem;
+}
+
+.campaign-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.campaign-health-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.campaign-health-summary span {
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  padding: 0.12rem 0.42rem;
+  background: hsl(var(--muted) / 0.25);
+}
+
+.campaign-health-summary strong {
+  color: var(--text-h);
+}
+
+.campaign-sort-controls {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-left: auto;
 }
 
 .grade-box {

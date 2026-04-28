@@ -5,7 +5,6 @@ import { RequireAuth } from './components/RequireAuth'
 import { UserProvider } from './context/UserContext'
 import { Analysis } from './pages/Analysis'
 import { Accounts } from './pages/Accounts'
-import { AnalyzedAds } from './pages/AnalyzedAds'
 import { CampaignMaps } from './pages/CampaignMaps'
 import { ConnectMeta } from './pages/ConnectMeta'
 import { Creatives } from './pages/Creatives'
@@ -39,9 +38,9 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="analysis" element={<Analysis />} />
               <Route path="video-report" element={<VideoReport />} />
-              <Route path="analyzed-ads" element={<AnalyzedAds />} />
+              <Route path="analyzed-ads" element={<Navigate to="/app/accounts" replace />} />
               <Route path="impact-tracking" element={<ImpactTracking />} />
-              <Route path="creatives" element={<Creatives />} />
+              <Route path="creatives" element={<Navigate to="/app/accounts" replace />} />
               <Route path="products" element={<ProductsSetup />} />
               <Route path="campaigns" element={<CampaignMaps />} />
               <Route path="settings" element={<Settings />} />
