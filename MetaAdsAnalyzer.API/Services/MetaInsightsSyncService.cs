@@ -46,9 +46,28 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
 
     private static readonly HashSet<string> PurchaseValueTypes = PurchaseActionTypes;
 
+    private static readonly string[] PurchaseActionPreference =
+    {
+        "purchase",
+        "omni_purchase",
+        "offsite_conversion.fb_pixel_purchase",
+        "onsite_web_purchase",
+        "onsite_web_app_purchase",
+        "web_in_store_purchase",
+    };
+
     private static readonly HashSet<string> AddToCartTypes = new(StringComparer.Ordinal)
     {
         "add_to_cart", "omni_add_to_cart", "offsite_conversion.fb_pixel_add_to_cart",
+    };
+
+    private static readonly string[] AddToCartPreference =
+    {
+        "add_to_cart",
+        "omni_add_to_cart",
+        "offsite_conversion.fb_pixel_add_to_cart",
+        "onsite_web_add_to_cart",
+        "onsite_web_app_add_to_cart",
     };
 
     private static readonly HashSet<string> InitiateCheckoutTypes = new(StringComparer.Ordinal)
@@ -56,9 +75,26 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         "initiate_checkout", "omni_initiated_checkout", "offsite_conversion.fb_pixel_initiate_checkout",
     };
 
+    private static readonly string[] InitiateCheckoutPreference =
+    {
+        "initiate_checkout",
+        "omni_initiated_checkout",
+        "offsite_conversion.fb_pixel_initiate_checkout",
+        "onsite_web_initiate_checkout",
+    };
+
     private static readonly HashSet<string> ViewContentTypes = new(StringComparer.Ordinal)
     {
         "view_content", "omni_view_content", "offsite_conversion.fb_pixel_view_content",
+    };
+
+    private static readonly string[] ViewContentPreference =
+    {
+        "view_content",
+        "omni_view_content",
+        "offsite_conversion.fb_pixel_view_content",
+        "onsite_web_view_content",
+        "onsite_web_app_view_content",
     };
 
     private static readonly HashSet<string> LandingPageViewTypes = new(StringComparer.Ordinal)
@@ -1034,11 +1070,13 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         row.TryGetProperty("actions", out var actions);
         row.TryGetProperty("action_values", out var actionValues);
 
-        var purchases = SumMatchingActionLong(actions, PurchaseActionTypes);
-        var purchaseValue = SumMatchingActionDecimal(actionValues, PurchaseValueTypes);
+        var purchases = ResolveCanonicalActionLong(actions, PurchaseActionPreference);
+        var purchaseValue = ResolveCanonicalActionDecimal(actionValues, PurchaseActionPreference);
 
         row.TryGetProperty("video_play_actions", out var vPlay);
-        var video3s = SumVideo3s(vPlay);
+        var video3sFromActions = SumMatchingActionLong(actions, Video3sTypes);
+        var video3sFromTopLevel = SumVideo3s(vPlay);
+        var video3s = video3sFromActions > 0 ? video3sFromActions : video3sFromTopLevel;
 
         var videoThru = SumAllActionLong(row, "video_thruplay_watched_actions");
         if (videoThru <= 0)
@@ -1082,9 +1120,9 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
             CpcLink = ParseDecimal(row, "cost_per_inline_link_click"),
             Purchases = purchases,
             PurchaseValue = purchaseValue,
-            AddToCart = SumMatchingActionLong(actions, AddToCartTypes),
-            InitiateCheckout = SumMatchingActionLong(actions, InitiateCheckoutTypes),
-            ViewContent = SumMatchingActionLong(actions, ViewContentTypes),
+            AddToCart = ResolveCanonicalActionLong(actions, AddToCartPreference),
+            InitiateCheckout = ResolveCanonicalActionLong(actions, InitiateCheckoutPreference),
+            ViewContent = ResolveCanonicalActionLong(actions, ViewContentPreference),
             LandingPageViews = SumMatchingActionLong(actions, LandingPageViewTypes),
             VideoPlay3s = video3s,
             VideoThruplay = videoThru,
@@ -1244,6 +1282,62 @@ public sealed class MetaInsightsSyncService : IMetaInsightsSyncService
         }
 
         return sum;
+    }
+
+    private static long ResolveCanonicalActionLong(JsonElement actions, IReadOnlyList<string> preference)
+    {
+        if (actions.ValueKind != JsonValueKind.Array)
+        {
+            return 0;
+        }
+
+        foreach (var type in preference)
+        {
+            foreach (var item in actions.EnumerateArray())
+            {
+                var actionType = GetString(item, "action_type");
+                if (!string.Equals(actionType, type, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var value = ParseLong(item, "value");
+                if (value > 0)
+                {
+                    return value;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static decimal ResolveCanonicalActionDecimal(JsonElement actions, IReadOnlyList<string> preference)
+    {
+        if (actions.ValueKind != JsonValueKind.Array)
+        {
+            return 0m;
+        }
+
+        foreach (var type in preference)
+        {
+            foreach (var item in actions.EnumerateArray())
+            {
+                var actionType = GetString(item, "action_type");
+                if (!string.Equals(actionType, type, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var value = ParseDecimal(item, "value");
+                if (value > 0m)
+                {
+                    return value;
+                }
+            }
+        }
+
+        return 0m;
     }
 
     private static long SumVideo3s(JsonElement videoPlayActions)

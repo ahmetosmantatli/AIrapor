@@ -356,6 +356,16 @@ public class SavedReportsController : ControllerBase
 
     private async Task FillBeforeMetricsAsync(Core.Entities.SavedReportSuggestion suggestion, CancellationToken ct)
     {
+        // Immutable snapshot lock: if any before metric already exists, never overwrite it.
+        if (suggestion.BeforeRoas is not null
+            || suggestion.BeforeHookRate is not null
+            || suggestion.BeforeHoldRate is not null
+            || suggestion.BeforeSpend is not null
+            || suggestion.BeforePurchases is not null)
+        {
+            return;
+        }
+
         var adId = suggestion.SavedReport.AdId;
         var userId = suggestion.SavedReport.UserId;
         var raw = await _db.RawInsights.AsNoTracking()

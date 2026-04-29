@@ -820,7 +820,7 @@ export function VideoReport() {
               </div>
               <div className="vr-modal-right">
                 <div className="vr-diagnosis-box">
-                  <strong>AI TEŞHİSİ</strong>
+                  <strong>Adlyz Teşhisi</strong>
                   <p>{diagnosisText(aggregate)}</p>
                 </div>
                 <div className="vr-recs">
@@ -927,30 +927,28 @@ export function VideoReport() {
             </div>
             <div className="vr-funnel">
               <h3>Dönüşüm Hunisi</h3>
-              <div className="vr-funnel-list">
-                {funnelSteps.map((step, i) => {
-                  const width = Math.max(28, 100 - i * (isVideoAggregate ? 8 : 12))
-                  const highDrop = (step.lossPct ?? 0) > 70
-                  return (
-                    <div key={`${step.label}-${i}`} className="vr-funnel-item-wrap">
-                      <div
-                        className={`vr-funnel-item ${highDrop ? 'vr-funnel-item-risk' : ''}`}
-                        style={{ width: `${width}%` }}
-                        title={
-                          step.lossPct == null
-                            ? `${step.label}`
-                            : `Bu adımda ${step.lostCount.toLocaleString('tr-TR')} kişi kaybedildi`
-                        }
-                      >
-                        <span>{step.label}</span>
-                        <strong>{step.value.toLocaleString('tr-TR')}</strong>
-                        <em>{step.lossPct == null ? '—' : `Düşüş ${step.lossPct.toFixed(1)}%`}</em>
-                      </div>
-                      {i < funnelSteps.length - 1 && <span className="vr-funnel-arrow">↓</span>}
-                    </div>
-                  )
-                })}
-              </div>
+              <table className="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Adım</th>
+                    <th>Değer</th>
+                    <th>Kayıp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnelSteps.map((step, i) => (
+                    <tr key={`${step.label}-${i}`}>
+                      <td>{step.label}</td>
+                      <td>{step.value.toLocaleString('tr-TR')}</td>
+                      <td>
+                        {step.lossPct == null
+                          ? '—'
+                          : `${step.lostCount.toLocaleString('tr-TR')} (${step.lossPct.toFixed(1)}%)`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               {aggregate.purchases > 0 && aggregate.addToCart === 0 && (
                 <p className="muted small" style={{ marginTop: '0.65rem', color: '#f59e0b' }}>
                   Satın alma verisi farklı attribution window'dan gelebilir. Sepet verisi bu pencerede görünmüyor olabilir.

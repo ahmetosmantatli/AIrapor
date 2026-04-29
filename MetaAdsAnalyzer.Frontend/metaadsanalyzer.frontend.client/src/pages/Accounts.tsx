@@ -5,6 +5,7 @@ import {
   getMetaCampaigns,
   getProducts,
   getRawInsights,
+  postInsightsSync,
   postSelectActiveMetaAdAccount,
 } from '../api/client'
 import type { CampaignMapItem, LinkedMetaAdAccountItem, MetaCampaignItem, ProductResponse, RawInsightRow } from '../api/types'
@@ -356,7 +357,11 @@ export function Accounts() {
     const spend = raw?.spend ?? 0
     const ctr = raw && raw.impressions > 0 ? (raw.linkClicks / raw.impressions) * 100 : 0
     const roas = raw?.roas ?? 0
-    const cpa = raw?.cpa ?? Number.POSITIVE_INFINITY
+    const cpa = (raw?.cpa ?? 0) > 0
+      ? (raw?.cpa ?? Number.POSITIVE_INFINITY)
+      : (raw?.purchases ?? 0) > 0
+        ? spend / Math.max(1, raw?.purchases ?? 0)
+        : Number.POSITIVE_INFINITY
     const p = productByCampaign.get(c.id)
     const breakEven = p ? (p.cogs + p.shippingCost) / Math.max(p.sellingPrice * 0.65, 1) : 1
     const target = p ? breakEven + 0.8 : 1.8
@@ -408,7 +413,6 @@ export function Accounts() {
       const analyzedPurchaseValue = related.reduce((n, x) => n + (x.aggregate.purchaseValue ?? 0), 0)
       const analyzedPurchases = related.reduce((n, x) => n + (x.aggregate.purchases ?? 0), 0)
       const analyzedClicks = related.reduce((n, x) => n + (x.aggregate.linkClicks ?? 0), 0)
-
       const campaignRoasRaw = (rawCampaign?.roas ?? 0) > 0
         ? (rawCampaign?.roas ?? 0)
         : (rawCampaign?.spend ?? 0) > 0
@@ -475,6 +479,16 @@ export function Accounts() {
   }, [analyzedItems, campaignRows, latestRawByCampaignId, maps, products])
 
   const campaignCards = useMemo(() => {
+    const latestAnalyzedAtByCampaignId = new Map<string, string>()
+    for (const item of analyzedItems) {
+      const campaignId = (item.campaignId ?? '').trim()
+      if (!campaignId) continue
+      const prev = latestAnalyzedAtByCampaignId.get(campaignId)
+      if (!prev || item.analyzedAt > prev) {
+        latestAnalyzedAtByCampaignId.set(campaignId, item.analyzedAt)
+      }
+    }
+
     const rows = campaignRows.map((c) => {
       const base = scoreRow(c)
       const evalx = campaignEvaluations.get(c.id)
@@ -487,6 +501,7 @@ export function Accounts() {
         shownRoas: evalx?.roas ?? base.roas,
         shownCpa: Number.isFinite(base.cpa) ? base.cpa : null,
         shownGrade: evalx?.grade ?? base.grade,
+        latestAnalyzedAt: latestAnalyzedAtByCampaignId.get(c.id) ?? null,
       }
     })
     if (campaignSortBy === 'spend') {
@@ -504,7 +519,7 @@ export function Accounts() {
       const bs = b.evalx?.score ?? 0
       return bs - as
     })
-  }, [campaignEvaluations, campaignRows, campaignSortBy])
+  }, [analyzedItems, campaignEvaluations, campaignRows, campaignSortBy])
 
   const campaignHealthSummary = useMemo(() => {
     let healthy = 0
@@ -540,14 +555,22 @@ export function Accounts() {
     if (!raw) return base
     return {
       ...base,
-      spend: base.spend > 0 ? base.spend : raw.spend,
-      impressions: base.impressions > 0 ? base.impressions : raw.impressions,
-      linkClicks: base.linkClicks > 0 ? base.linkClicks : raw.linkClicks,
-      purchases: base.purchases > 0 ? base.purchases : raw.purchases,
-      videoPlay3s: base.videoPlay3s > 0 ? base.videoPlay3s : raw.videoPlay3s,
-      videoP100: base.videoP100 > 0 ? base.videoP100 : raw.videoP100,
-      roas: base.roas ?? raw.roas ?? null,
-      cpa: base.cpa ?? raw.cpa ?? null,
+      // Detail modal should prioritize latest raw Meta values for funnel consistency.
+      spend: raw.spend > 0 ? raw.spend : base.spend,
+      impressions: raw.impressions > 0 ? raw.impressions : base.impressions,
+      linkClicks: raw.linkClicks > 0 ? raw.linkClicks : base.linkClicks,
+      purchases: raw.purchases > 0 ? raw.purchases : base.purchases,
+      purchaseValue: raw.purchaseValue > 0 ? raw.purchaseValue : base.purchaseValue,
+      addToCart: raw.addToCart > 0 ? raw.addToCart : base.addToCart,
+      initiateCheckout: raw.initiateCheckout > 0 ? raw.initiateCheckout : base.initiateCheckout,
+      videoPlay3s: raw.videoPlay3s > 0 ? raw.videoPlay3s : base.videoPlay3s,
+      thruPlay: raw.videoThruplay > 0 ? raw.videoThruplay : base.thruPlay,
+      videoP25: raw.videoP25 > 0 ? raw.videoP25 : base.videoP25,
+      videoP50: raw.videoP50 > 0 ? raw.videoP50 : base.videoP50,
+      videoP75: raw.videoP75 > 0 ? raw.videoP75 : base.videoP75,
+      videoP100: raw.videoP100 > 0 ? raw.videoP100 : base.videoP100,
+      roas: raw.roas ?? base.roas ?? null,
+      cpa: raw.cpa ?? base.cpa ?? null,
     }
   }, [activeAnalyzedAd, activeRawLatest])
 
@@ -574,10 +597,14 @@ export function Accounts() {
     }
     ;(async () => {
       try {
-        const rows = await getRawInsights(userId, 'ad')
+        await postInsightsSync(userId, 'ad', 'last_30d', {
+          adIds: [activeAnalyzedAd.adId],
+          metaAdAccountId: selectedAct ?? undefined,
+        }).catch(() => undefined)
+        const rows = await getRawInsights(userId, 'ad', { adId: activeAnalyzedAd.adId })
         if (cancelled) return
         const latest = rows
-          .filter((r) => r.entityId === activeAnalyzedAd.adId)
+          .filter((r) => sameEntityId(r.entityId, activeAnalyzedAd.adId))
           .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))[0] ?? null
         setActiveRawLatest(latest)
       } catch {
@@ -587,7 +614,7 @@ export function Accounts() {
     return () => {
       cancelled = true
     }
-  }, [activeAnalyzedAd, userId])
+  }, [activeAnalyzedAd, selectedAct, userId])
 
   return (
     <div className="page">
@@ -676,13 +703,16 @@ export function Accounts() {
             </div>
           </div>
           <div className="campaign-list">
-            {campaignCards.map(({ campaign: c, base: x, evalx, shownSpend, shownCtr, shownRoas, shownGrade, shownCpa }) => {
+            {campaignCards.map(({ campaign: c, base: x, evalx, shownSpend, shownCtr, shownRoas, shownGrade, shownCpa, latestAnalyzedAt }) => {
               return (
                 <button key={c.id} type="button" className="campaign-row" onClick={() => setSelectedCampaign(c)}>
                   <div className="campaign-main">
                     <div className="campaign-title">{c.name?.trim() || c.id}</div>
                     <div className="campaign-meta muted small">
                       {objectiveLabel(c.objective)} · <span className="status-dot status-live">Aktif</span>
+                    </div>
+                    <div className="muted small">
+                      Son analiz: {latestAnalyzedAt ? new Date(latestAnalyzedAt).toLocaleString('tr-TR') : 'Henüz analiz yok'}
                     </div>
                     <span className={`tag-chip ${x.tag === 'Sağlıklı' ? 'tag-ok' : 'tag-warn'}`}>{x.tag}</span>
                   </div>

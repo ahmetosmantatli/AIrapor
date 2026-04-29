@@ -602,11 +602,11 @@ export function ImpactTracking() {
               ) : null}
               <div className="dashboard-mini-stats">
                 <div>
-                  <span>Uygulama öncesi ROAS</span>
+                  <span>Uygulama öncesi ROAS <em className="impact-source impact-source-snapshot">Snapshot</em></span>
                   <strong>{selectedRow.beforeRoas == null ? '—' : `${selectedRow.beforeRoas.toFixed(2)}x`}</strong>
                 </div>
                 <div>
-                  <span>Seçilen gün ROAS</span>
+                  <span>Seçilen gün ROAS <em className="impact-source impact-source-live">Live</em></span>
                   <strong>{latestRawRoas == null ? '—' : `${latestRawRoas.toFixed(2)}x`}</strong>
                 </div>
                 <div>
@@ -622,19 +622,19 @@ export function ImpactTracking() {
               </div>
               <div className="dashboard-mini-stats" style={{ marginTop: '0.5rem' }}>
                 <div>
-                  <span>Uygulama öncesi Harcama</span>
+                  <span>Uygulama öncesi Harcama <em className="impact-source impact-source-snapshot">Snapshot</em></span>
                   <strong>{selectedRow.beforeSpend == null ? '—' : `₺${selectedRow.beforeSpend.toFixed(2)}`}</strong>
                 </div>
                 <div>
-                  <span>Güncel Harcama</span>
+                  <span>Güncel Harcama <em className="impact-source impact-source-live">Live</em></span>
                   <strong>{latestRawSpend == null ? '—' : `₺${latestRawSpend.toFixed(2)}`}</strong>
                 </div>
                 <div>
-                  <span>Uygulama öncesi Satın Alma</span>
+                  <span>Uygulama öncesi Satın Alma <em className="impact-source impact-source-snapshot">Snapshot</em></span>
                   <strong>{selectedRow.beforePurchases == null ? '—' : selectedRow.beforePurchases}</strong>
                 </div>
                 <div>
-                  <span>Güncel Satın Alma</span>
+                  <span>Güncel Satın Alma <em className="impact-source impact-source-live">Live</em></span>
                   <strong>{latestRawPurchases == null ? '—' : latestRawPurchases}</strong>
                 </div>
               </div>

@@ -1129,6 +1129,30 @@ code {
   margin-top: 0.1rem;
 }
 
+.impact-source {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 600;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+
+.impact-source-snapshot {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.impact-source-live {
+  color: #166534;
+  background: rgba(34, 197, 94, 0.13);
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
 .campaign-toolbar {
   display: flex;
   justify-content: space-between;
