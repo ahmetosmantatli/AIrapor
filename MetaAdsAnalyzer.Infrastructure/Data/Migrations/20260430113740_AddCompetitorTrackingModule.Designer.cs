@@ -3,6 +3,7 @@ using System;
 using MetaAdsAnalyzer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260430113740_AddCompetitorTrackingModule")]
+    partial class AddCompetitorTrackingModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -174,58 +177,6 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("competitor_ads");
-                });
-
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.CompetitorScrapeLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClosedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<int>("FetchedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<int>("InsertedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("StartedAt")
-                        .HasPrecision(3)
-                        .HasColumnType("timestamp(3) with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<int>("TrackedCompetitorId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UpdatedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TrackedCompetitorId", "StartedAt");
-
-                    b.HasIndex("UserId", "StartedAt");
-
-                    b.ToTable("competitor_scrape_log");
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.ComputedMetric", b =>
@@ -1165,25 +1116,6 @@ namespace MetaAdsAnalyzer.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("TrackedCompetitor");
-                });
-
-            modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.CompetitorScrapeLog", b =>
-                {
-                    b.HasOne("MetaAdsAnalyzer.Core.Entities.TrackedCompetitor", "TrackedCompetitor")
-                        .WithMany()
-                        .HasForeignKey("TrackedCompetitorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MetaAdsAnalyzer.Core.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TrackedCompetitor");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MetaAdsAnalyzer.Core.Entities.ComputedMetric", b =>

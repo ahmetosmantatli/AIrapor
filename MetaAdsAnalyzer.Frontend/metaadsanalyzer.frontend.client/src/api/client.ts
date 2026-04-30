@@ -27,6 +27,9 @@ import type {
   SavedReportSuggestion,
   SavedReportImpactFeedItem,
   SavedReportImpactDetail,
+  CompetitorListItem,
+  CompetitorAdItem,
+  SyncCompetitorResult,
 } from './types'
 
 function assertPositiveUserId(userId: number, context: string): void {
@@ -506,4 +509,50 @@ export async function getSavedReportImpactDetail(
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json() as Promise<SavedReportImpactDetail>
+}
+
+export async function getCompetitorsByUser(userId: number): Promise<CompetitorListItem[]> {
+  const res = await authFetch(`/api/competitors/by-user/${userId}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<CompetitorListItem[]>
+}
+
+export async function createCompetitor(body: {
+  displayName: string
+  pageRef: string
+  pageId?: string | null
+}): Promise<CompetitorListItem> {
+  return postJson<CompetitorListItem>('/api/competitors', body)
+}
+
+export async function deactivateCompetitor(competitorId: number): Promise<void> {
+  const res = await authFetch(`/api/competitors/${competitorId}/deactivate`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+}
+
+export async function getCompetitorAds(
+  competitorId: number,
+  opts?: { format?: string; range?: 'all' | '7d' | '30d'; status?: 'all' | 'active' | 'inactive'; take?: number; skip?: number },
+): Promise<CompetitorAdItem[]> {
+  const params = new URLSearchParams()
+  if (opts?.format && opts.format !== 'all') params.set('format', opts.format)
+  if (opts?.range) params.set('range', opts.range)
+  if (opts?.status) params.set('status', opts.status)
+  if (typeof opts?.take === 'number' && opts.take > 0) params.set('take', String(Math.trunc(opts.take)))
+  if (typeof opts?.skip === 'number' && opts.skip >= 0) params.set('skip', String(Math.trunc(opts.skip)))
+  const q = params.toString()
+  const res = await authFetch(`/api/competitors/${competitorId}/ads${q ? `?${q}` : ''}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<CompetitorAdItem[]>
+}
+
+export async function postCompetitorSync(competitorId: number): Promise<SyncCompetitorResult> {
+  return postJson<SyncCompetitorResult>(`/api/competitors/${competitorId}/sync`, {})
 }

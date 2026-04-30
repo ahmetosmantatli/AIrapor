@@ -334,3 +334,41 @@ export type SavedReportImpactFeedItem = {
 export type SavedReportImpactDetail = SavedReportImpactFeedItem & {
   analyzedAt: string
 }
+
+export type CompetitorListItem = {
+  id: number
+  displayName: string
+  pageRef: string
+  pageId: string | null
+  isActive: boolean
+  createdAt: string
+  lastSyncedAt: string | null
+  lastSyncStatus: string | null
+  lastSyncError: string | null
+  newAdsLast7Days: number
+}
+
+export type CompetitorAdItem = {
+  id: number
+  metaAdArchiveId: string
+  format: string
+  bodyText: string | null
+  titleText: string | null
+  descriptionText: string | null
+  snapshotUrl: string | null
+  publisherPlatforms: string[]
+  languages: string[]
+  deliveryStartTime: string | null
+  deliveryStopTime: string | null
+  firstSeenAt: string
+  lastSeenAt: string
+  isActive: boolean
+}
+
+export type SyncCompetitorResult = {
+  fetchedCount: number
+  insertedCount: number
+  updatedCount: number
+  closedCount: number
+  finishedAt: string
+}

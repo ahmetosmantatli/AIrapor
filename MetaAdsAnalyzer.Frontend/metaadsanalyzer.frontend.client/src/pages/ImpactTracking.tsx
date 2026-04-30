@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getRawInsights, getSavedReportImpactDetail, listSavedReportImpacts, postInsightsSync } from '../api/client'
 import { useUser } from '../context/UserContext'
 import './Pages.css'
@@ -62,6 +63,7 @@ function sameAdId(left: string, right: string): boolean {
 
 export function ImpactTracking() {
   const { userId } = useUser()
+  const navigate = useNavigate()
   const [rows, setRows] = useState<ImpactRow[]>([])
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<number | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -516,7 +518,9 @@ export function ImpactTracking() {
                 type="button"
                 className="btn primary"
                 onClick={() => {
-                  setDetailOpen(true)
+                  setSelectedSuggestionId(null)
+                  setDetailOpen(false)
+                  navigate(`/app/impact-tracking/${selectedRow.suggestionId}`)
                 }}
               >
                 Detaylar

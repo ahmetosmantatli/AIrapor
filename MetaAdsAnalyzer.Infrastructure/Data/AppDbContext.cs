@@ -39,6 +39,12 @@ public class AppDbContext : DbContext
 
     public DbSet<UserSyncLog> UserSyncLogs => Set<UserSyncLog>();
 
+    public DbSet<TrackedCompetitor> TrackedCompetitors => Set<TrackedCompetitor>();
+
+    public DbSet<CompetitorAd> CompetitorAds => Set<CompetitorAd>();
+
+    public DbSet<CompetitorScrapeLog> CompetitorScrapeLogs => Set<CompetitorScrapeLog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -1153,6 +1153,178 @@ code {
   border-color: rgba(34, 197, 94, 0.32);
 }
 
+.impact-detail-page {
+  position: relative;
+  min-height: calc(100vh - 110px);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.impact-detail-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.35), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(167, 139, 250, 0.22), transparent 42%),
+    #070a14;
+}
+
+.impact-detail-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 10, 20, 0.62), rgba(7, 10, 20, 0.86));
+}
+
+.impact-detail-logo-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.impact-detail-logo-stage {
+  width: min(58vw, 680px);
+  height: min(58vw, 680px);
+  max-width: 680px;
+  max-height: 680px;
+  filter: drop-shadow(0 0 42px rgba(99, 102, 241, 0.35));
+  opacity: 0.95;
+}
+
+.impact-detail-content {
+  position: relative;
+  z-index: 2;
+  padding: 1rem;
+}
+
+.impact-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.impact-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.impact-detail-grid-plain {
+  margin-top: 0.2rem;
+}
+
+.impact-column {
+  padding: 0.35rem 0;
+}
+
+.impact-metric-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.impact-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(10, 14, 28, 0.52);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  animation: impactPulse 2.8s ease-in-out infinite;
+}
+
+.impact-metric-row:nth-child(2) { animation-delay: .2s; }
+.impact-metric-row:nth-child(3) { animation-delay: .4s; }
+.impact-metric-row:nth-child(4) { animation-delay: .6s; }
+
+.impact-metric-row span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.impact-metric-row strong {
+  font-size: 0.92rem;
+}
+
+.impact-diff-strip {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.impact-diff-strip > div {
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(8, 12, 24, 0.65);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  animation: impactPulse 3s ease-in-out infinite;
+}
+
+.impact-diff-strip span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.impact-diff-strip strong {
+  font-size: 0.9rem;
+}
+
+.impact-detail-content .page-title {
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.impact-detail-content .panel-title {
+  font-size: 0.95rem;
+}
+
+.impact-detail-content .muted.small {
+  font-size: 0.72rem;
+}
+
+.impact-detail-content .panel {
+  backdrop-filter: blur(6px);
+  background: rgba(8, 12, 24, 0.65);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  animation: impactFloat 5.2s ease-in-out infinite;
+}
+
+.impact-detail-content .dashboard-mini-stats > div {
+  background: rgba(10, 14, 28, 0.55);
+}
+
+@keyframes impactFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes impactPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(129, 140, 248, 0); }
+  50% { box-shadow: 0 0 14px rgba(129, 140, 248, 0.16); }
+}
+
+@media (max-width: 920px) {
+  .impact-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .impact-detail-logo-stage {
+    width: min(82vw, 520px);
+    height: min(82vw, 520px);
+  }
+
+  .impact-diff-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .campaign-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1713,6 +1885,80 @@ code {
 
 .dashboard-pos { color: #34d399; }
 .dashboard-neg { color: #f87171; }
+
+.competitor-grid {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.competitor-brand-card {
+  text-align: left;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.75rem;
+  cursor: pointer;
+}
+
+.competitor-brand-card:hover {
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+.competitor-brand-card-active {
+  border-color: hsl(var(--primary) / 0.72);
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
+}
+
+.competitor-brand-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.competitor-ad-grid {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.65rem;
+}
+
+.competitor-ad-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.competitor-ad-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.competitor-ad-text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-h);
+}
+
+.competitor-ad-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 0.25rem;
+}
+
+.competitor-create-modal {
+  width: min(560px, 100%);
+}
 
 @media (max-width: 1120px) {
   .dashboard-v2-grid {

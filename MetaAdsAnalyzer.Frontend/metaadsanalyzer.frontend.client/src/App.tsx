@@ -11,6 +11,8 @@ import { Dashboard } from './pages/Dashboard'
 import { LandingPage } from './pages/LandingPage'
 import { Login } from './pages/Login'
 import { ImpactTracking } from './pages/ImpactTracking'
+import { ImpactTrackingDetail } from './pages/ImpactTrackingDetail'
+import { Competitors } from './pages/Competitors'
 import { ProductsSetup } from './pages/ProductsSetup'
 import { Register } from './pages/Register'
 import { Settings } from './pages/Settings'
@@ -39,6 +41,8 @@ export default function App() {
               <Route path="video-report" element={<VideoReport />} />
               <Route path="analyzed-ads" element={<Navigate to="/app/accounts" replace />} />
               <Route path="impact-tracking" element={<ImpactTracking />} />
+              <Route path="impact-tracking/:suggestionId" element={<ImpactTrackingDetail />} />
+              <Route path="competitors" element={<Competitors />} />
               <Route path="creatives" element={<Navigate to="/app/accounts" replace />} />
               <Route path="products" element={<ProductsSetup />} />
               <Route path="campaigns" element={<CampaignMaps />} />

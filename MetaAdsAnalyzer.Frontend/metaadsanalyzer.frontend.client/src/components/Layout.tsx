@@ -3,6 +3,7 @@ import {
   Clapperboard,
   Activity,
   LayoutDashboard,
+  ScanSearch,
   Link2,
   LogOut,
   Settings,
@@ -24,6 +25,7 @@ const nav: Array<{
   { to: '/app/dashboard', label: 'Özet', icon: LayoutDashboard },
   { to: '/app/video-report', label: 'AI Video Rapor', icon: Clapperboard },
   { to: '/app/impact-tracking', label: 'Etki Takibi', icon: Activity },
+  { to: '/app/competitors', label: 'Rakip Takibi', icon: ScanSearch },
   { to: '/app/settings', label: 'Ayarlar', icon: Settings },
   { to: '/connect', label: 'Meta', icon: Link2 },
 ]
